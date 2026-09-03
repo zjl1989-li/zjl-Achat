@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>zjl-Achat · 多 agent 协作</title>
+  <link rel="icon" type="image/png" href="./favicon.png" />
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- ================= LEFT: groups + settings ================= -->
+    <aside id="left">
+      <div class="left-head"><button id="btnNewGroup">+ 新建群</button></div>
+      <input id="groupSearch" class="group-search" type="search" placeholder="搜索群…" autocomplete="off" />
+      <div id="groupListHead" class="section-head" title="收起 / 展开群列表">
+        <span class="sec-chevron">
+          <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
+        </span>
+        <span class="sec-title">群聊</span>
+        <span class="sec-count" id="groupCount"></span>
+        <button id="btnOpenArchive" class="sec-folder" title="打开归档文件夹">
+          <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5h11V6.8H2.5z"/><path d="M3.5 6.8v6.7h9V6.8"/><path d="M8 6.8v3.2"/></svg>
+        </button>
+      </div>
+      <div id="groupList" class="group-list"></div>
+      <div class="left-foot">
+        <div class="left-foot-row">
+          <button id="btnTheme" class="theme-toggle" title="切换浅色 / 深色主题">
+            <span class="tt-seg tt-sun">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="3"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.6 3.6l1.4 1.4M11 11l1.4 1.4M12.4 3.6L11 5M5 11l-1.4 1.4"/></svg>
+            </span>
+            <span class="tt-seg tt-moon">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13.2 9.6A5.6 5.6 0 1 1 6.4 2.8a4.6 4.6 0 0 0 6.8 6.8z"/></svg>
+            </span>
+          </button>
+          <button id="btnSettings" class="settings-btn">
+            <span class="sb-ico">
+              <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M2.5 4h6.2M12 4h1.5"/><path d="M2.5 8h1.8M7.3 8h6.2"/><path d="M2.5 12h4.8M10.5 12h3"/><circle cx="10.7" cy="4" r="1.4"/><circle cx="5.2" cy="8" r="1.4"/><circle cx="8.3" cy="12" r="1.4"/></svg>
+            </span>
+            <span class="sb-title">设置</span>
+          </button>
+        </div>
+      </div>
+    </aside>
+    <div id="resLeft" class="resizer" title="拖动调整宽度">
+      <button id="foldLeft" class="fold-btn" title="收起 / 展开左侧栏">
+        <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3 5.5 8 10 13"/></svg>
+      </button>
+    </div>
+
+    <!-- ================= CENTER: chat ================= -->
+    <main id="center">
+      <div id="noticeBar" class="notice-bar hidden"></div>
+      <header id="chatHead">
+        <div class="title" id="convTitle">选择一个群</div>
+        <div class="head-actions">
+          <span class="avatars" id="memberAvatars"></span>
+          <span class="ha-divider"></span>
+          <button id="btnConsensus" title="发起多 agent 协商 / 共识">
+            <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.6" cy="5.4" r="2.2"/><circle cx="11.4" cy="6" r="1.8"/><path d="M2 13.4c0-2.1 1.6-3.6 3.6-3.6s3.6 1.5 3.6 3.6"/><path d="M10.6 10c1.6 0 3.4 1.3 3.4 3.2"/></svg>
+          </button>
+          <button id="btnGroupSettings" title="群设置">
+            <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M2.5 4h6.2M12 4h1.5"/><path d="M2.5 8h1.8M7.3 8h6.2"/><path d="M2.5 12h4.8M10.5 12h3"/><circle cx="10.7" cy="4" r="1.4"/><circle cx="5.2" cy="8" r="1.4"/><circle cx="8.3" cy="12" r="1.4"/></svg>
+          </button>
+        </div>
+      </header>
+      <div id="negotiationBar" class="negotiation-bar hidden"></div>
+      <div id="messages" class="messages">
+        <div class="empty">← 从左侧选一个群，或直接新建群开始</div>
+      </div>
+      <button id="jumpDown" class="jump-down hidden" title="回到最新消息">↓</button>
+      <button id="drawerToggle" title="群空间 · 产物">
+        <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/></svg>
+      </button>
+      <div class="composer">
+        <div class="composer-box">
+          <textarea id="input" placeholder="输入消息 / 分配任务给群内 agent…（Enter 发送，Shift+Enter 换行）"></textarea>
+          <div class="composer-bar">
+            <button class="tool" id="btnPlus" title="上传：文件 / 图片 / 视频 / 音频">
+              <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M8 2v12M2 8h12"/></svg>
+            </button>
+            <div id="plusMenu" class="plus-menu hidden">
+              <button data-kind="file"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 1.8h5.1l2.9 2.9v9.5H4z"/><path d="M9.1 1.8v2.9H12"/></svg> 文件</button>
+              <button data-kind="image"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2.2" y="3" width="11.6" height="10" rx="1.5"/><circle cx="5.7" cy="6.5" r="1.1"/><path d="M2.2 11.4l3.5-3.5 2.7 2.7 2.1-2.1 3 2.9"/></svg> 图片</button>
+              <button data-kind="video"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2.2" y="4" width="9.4" height="8" rx="1.5"/><path d="M11.6 6.7l2.2-1.5v5.6l-2.2-1.5z"/></svg> 视频</button>
+              <button data-kind="audio"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 13V3.6l5.4-1.2V11"/><circle cx="4.2" cy="13" r="1.8"/><circle cx="9.6" cy="11.1" r="1.8"/></svg> 音频</button>
+              <button data-kind="artifact" class="sep"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 10.5V3.2M4.8 6.4 8 3.2l3.2 3.2"/><path d="M2.5 12.5v1.2h11v-1.2"/></svg> 上传产物</button>
+            </div>
+            <select id="sendTarget" title="发送对象">
+              <option value="">@ 所有人</option>
+            </select>
+            <button class="tool mic-mini" id="btnVoice" title="语音输入（占位：接 Web Speech / 豆包 ASR）">
+              <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="4" height="7" rx="2"/><path d="M4.5 8a3.5 3.5 0 0 0 7 0"/><path d="M8 11.5V14"/></svg>
+            </button>
+            <button id="btnSend" title="发送">
+              <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2 7.3 8.7"/><path d="M14 2 9.9 14l-2.6-5.3L2 6.1 14 2z"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+    <div id="resRight" class="resizer" title="拖动调整宽度">
+      <button id="foldRight" class="fold-btn" title="收起 / 展开右侧栏">
+        <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3l4.5 5L6 13"/></svg>
+      </button>
+    </div>
+
+    <!-- ================= RIGHT: group space ================= -->
+    <aside id="right">
+      <div class="right-head">群空间 · 产物 <span class="hint">按来源分色</span>
+        <button id="btnOpenFolder" class="folder-btn" title="打开产物文件夹">
+          <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M1.8 3.8h4.2L8 5.5h6.2v7.7H1.8z"/></svg>
+        </button>
+      </div>
+      <div class="space-tabs" id="spaceTabs">
+        <button class="stab active" data-tab="overview">概览</button>
+        <button class="stab" data-tab="file">文件</button>
+        <button class="stab" data-tab="image">图片</button>
+        <button class="stab" data-tab="media">音视频</button>
+        <button class="stab" data-tab="tree">代码树</button>
+        <button class="stab" data-tab="browser">浏览器</button>
+        <button class="stab" data-tab="history">上下文</button>
+      </div>
+      <div id="spaceBody" class="space-body"></div>
+      <div id="artView" class="art-view hidden"></div>
+    </aside>
+  </div>
+
+  <!-- ============ MODAL: agent registry / access ============ -->
+  <div id="settingsModal" class="modal hidden">
+    <div class="modal-box">
+      <div class="modal-head">设置 <button id="closeSettings">✕</button></div>
+      <div id="agentRegistry" class="agent-registry"></div>
+    </div>
+  </div>
+  <!-- ============ MODAL: onboard agent wizard ============ -->
+  <div id="wizardModal" class="modal hidden">
+    <div class="modal-box" style="max-width:580px">
+      <div class="modal-head"><button id="wizBackHead" class="wiz-back-head">← 返回</button><span id="wizTitle">接入 agent</span><button id="closeWizard">✕</button></div>
+      <div class="wstep hidden" data-step="pick">
+        <div class="wiz-hint">本机检测到以下 agent，勾选要接入的：</div>
+        <div id="discList" class="wiz-list"></div>
+        <div id="assistDiscover"></div>
+        <div class="wiz-actions"><button id="btnOnboardDisc" class="wbtn primary">接入选中</button></div>
+      </div>
+      <div class="wstep hidden" data-step="kind">
+        <div class="wiz-hint">它属于下面哪种？</div>
+        <div id="typeList" class="wiz-list"></div>
+        <div id="assistKind"></div>
+      </div>
+      <div class="wstep hidden" data-step="cfg">
+        <div id="fieldList" class="wiz-fields"></div>
+        <div id="assistBox"></div>
+        <div id="probeHint" class="wiz-probe"></div>
+        <div class="wiz-actions"><button id="btnSaveWiz" class="wbtn primary">保存并接入</button></div>
+      </div>
+    </div>
+  </div>
+  <!-- ============ MODAL: connect mode card (foreign agents) ============ -->
+  <div id="connectModal" class="modal hidden">
+    <div class="modal-box" style="max-width:520px">
+      <div class="modal-head">连接方式 <button id="closeConnect">✕</button></div>
+      <div id="connectCardList" class="wiz-list"></div>
+      <div class="wiz-actions"><button id="btnConnectDone" class="wbtn primary">按所选方式接入</button></div>
+    </div>
+  </div>
+  <!-- ============ MODAL: group settings ============ -->
+  <div id="groupModal" class="modal hidden">
+    <div class="modal-box">
+      <div class="modal-head">群设置 <button id="closeGroup">✕</button></div>
+      <div class="field"><label>群名称</label><input id="grpNameInput" type="text" /></div>
+      <div class="section-label" style="padding-left:0">成员 agent（勾选进群）</div>
+      <div id="groupMembers" class="group-members"></div>
+      <div id="delegateSlot"></div>
+      <div class="modal-foot">
+        <button id="btnSaveGroup" class="primary">保存</button>
+        <button id="btnCloseGroup2">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ MODAL: consensus / negotiation ============ -->
+  <div id="consensusModal" class="modal hidden">
+    <div class="modal-box">
+      <div class="modal-head">发起多 agent 协商 <button id="closeConsensus">✕</button></div>
+      <div class="field"><label>议题</label><textarea id="csTopic" placeholder="要协商讨论的议题…（各 agent 将多轮交换立场直到达成共识）"></textarea></div>
+      <div class="field"><label>协商轮次（每轮各 agent 看到前几轮立场后再更新观点）</label>
+        <select id="csRounds"><option value="2">2 轮</option><option value="3" selected>3 轮</option><option value="4">4 轮</option><option value="5">5 轮</option></select></div>
+      <div class="section-label" style="padding-left:0">参与 agent（至少 2 个，勾选）</div>
+      <div id="csMembers" class="group-members"></div>
+      <div class="field"><label>综合者（汇总各方立场、产出最终共识结论）</label><select id="csSynth"></select></div>
+      <div class="modal-foot">
+        <button id="btnStartConsensus" class="primary">开始协商</button>
+        <button id="btnCloseConsensus2">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ POPOVER: agent status card (left-click avatar, editable) ============ -->
+  <div id="agentCard" class="popover hidden">
+    <div class="pop-head">
+      <span class="av lg" id="ac-av">?</span>
+      <div>
+        <div class="pop-name" id="ac-name">agent</div>
+        <div class="pop-status" id="ac-status"><span class="dot"></span><span id="ac-status-text">unknown</span></div>
+      </div>
+      <button id="ac-close" class="pop-x">✕</button>
+    </div>
+    <div class="pop-body" id="ac-body">
+      <label>名称</label><input id="ac-in-name" type="text" />
+      <div class="cap-row">能力：<span id="ac-cap" class="ac-cap">—</span></div>
+      <label>模型</label><input id="ac-in-model" type="text" />
+      <label>角色 / 说明</label><input id="ac-in-role" type="text" />
+      <label>系统提示词</label><textarea id="ac-in-sys"></textarea>
+    </div>
+    <div class="pop-foot">
+      <button id="ac-dm"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 3.5h11v8H6.5L4 14.5V11.5H2.5z"/></svg> 私信</button>
+      <button id="ac-save" class="primary">保存修改</button>
+    </div>
+  </div>
+
+  <!-- ============ CONTEXT MENU: avatar right-click ============ -->
+  <div id="ctxMenu" class="ctx-menu hidden">
+    <div class="ctx-item" data-act="settings"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M2.5 4h6.2M12 4h1.5"/><path d="M2.5 8h1.8M7.3 8h6.2"/><path d="M2.5 12h4.8M10.5 12h3"/><circle cx="10.7" cy="4" r="1.4"/><circle cx="5.2" cy="8" r="1.4"/><circle cx="8.3" cy="12" r="1.4"/></svg> agent 设置</div>
+    <div class="ctx-item" data-act="launch"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 3.5l7 4.5-7 4.5z"/></svg> 启动 / 停止</div>
+  </div>
+
+  <!-- ============ POPOVER: group-item actions (⋯) ============ -->
+  <div id="groupMenu" class="ctx-menu hidden"></div>
+
+  <!-- ============ POPOVER: artifact actions (⋯ on each space item) ============ -->
+  <div id="artMenu" class="ctx-menu hidden">
+    <div class="ctx-item" data-act="view"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M1.6 8S4 3.7 8 3.7 14.4 8 14.4 8 12 12.3 8 12.3 1.6 8 1.6 8z"/><circle cx="8" cy="8" r="2"/></svg> 查看 / 打开</div>
+    <div class="ctx-item" data-act="folder"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M1.8 3.8h4.2L8 5.5h6.2v7.7H1.8z"/></svg> 打开所在文件夹</div>
+    <div class="ctx-item" data-act="rename"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10.8 2.6l2.6 2.6L5.4 13.2l-2.8.2.2-2.8z"/></svg> 重命名</div>
+    <div class="ctx-item" data-act="share"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6.4 9.6 9.6 6.4"/><path d="M5.5 10.5 4 12a2 2 0 0 0 2.8 2.8l1.5-1.5"/><path d="M10.5 5.5 12 4A2 2 0 0 0 9.2 1.2L7.7 2.7"/></svg> 分享（复制链接）</div>
+    <div class="ctx-item" data-act="send"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2 2.6 7.7l4.5 1.6L8.7 14z"/><path d="M7.1 9.3 14 2"/></svg> 发送到群聊</div>
+    <div class="ctx-item" data-act="delete"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4.5h10M6.5 4.5V2.8h3v1.7"/><path d="M4.6 4.5l.7 9h5.4l.7-9"/><path d="M6.6 7.5v3.5M9.4 7.5v3.5"/></svg> 删除</div>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>

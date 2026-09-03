@@ -1,0 +1,43 @@
+# secrets / local env
+.env
+
+# runtime app data (user conversations, agent config) — provide a sample at release time
+data.json
+server/space/
+server/avatars/
+server/archive/
+bridge/
+
+# logs
+*.log
+.achat-boot.log
+server.err.log
+
+# store snapshots / legacy copies
+server/data.json.bak
+server/data.json.bak-*
+server/data.json.corrupt
+server/data.json.pre-optimize
+
+# temp probes / scratch from dev sessions
+_probe/
+%SystemDrive%/
+tmp-*.mjs
+dshhist.json
+
+# local-only launch helpers (contain user-specific paths)
+start.ps1
+
+# dev screenshots / scratch under desktop
+desktop/_*
+desktop/proof_*.png
+
+# stale code backups
+public/.backup-*/
+
+# deps (project is zero-dependency, but keep the rule)
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
