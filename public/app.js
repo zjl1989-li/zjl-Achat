@@ -1782,6 +1782,9 @@
         };
         return row;
       };
+      if ((a.connect.modes || []).some((m) => m.key === 'cli')) {
+        sec.appendChild(mkMode('cli', 'CLI 直连（codex exec）', '每条消息跑一轮 codex exec，模型/代理由 ~/.codex/config.toml 决定'));
+      }
       sec.appendChild(mkMode('official', '直连官方模型', '用自己的官方账号，直接拉起主程序静默运行'));
       sec.appendChild(mkMode('proxy', '走代理软件接国内模型', apps.length ? `已检测到 ${apps.length} 个代理软件，接入后自动拉起` : '', !apps.length));
       if (apps.length) {
@@ -1804,14 +1807,26 @@
     const launches = [];
     for (const a of wiz.picks) {
       const cfg = { ...(a.prefill || {}) };
+      let type = a.suggestedType;
       let wantLaunch = false;
       if (a.connect) {
         cfg.connectMode = wiz.connectChoices[a.name] || 'official';
         if (cfg.connectMode === 'proxy') { cfg.proxyApp = wiz.proxyChoices[a.name] || undefined; wantLaunch = true; }
+        if (cfg.connectMode === 'cli') {
+          // G class: one `codex exec` turn per message. No launcher, no
+          // persistent service — codex resolves model + proxy from its own
+          // ~/.codex/config.toml (codex++ local proxy at 127.0.0.1:57321).
+          type = 'G';
+          delete cfg.bridge; delete cfg.launcherExe;
+          cfg.cliCmd = 'codex';
+          cfg.cliArgs = ['exec', '--skip-git-repo-check', '{prompt}'];
+          cfg.outFileFlag = '-o';
+          cfg.timeoutMs = 300000;
+        }
       }
       const created = await api.createAgent({
         name: a.name, color: '#' + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0'),
-        avatar: a.avatar || undefined, adapterType: a.suggestedType, role: a.notes || '',
+        avatar: a.avatar || undefined, adapterType: type, role: a.notes || '',
         model: (a.prefill && a.prefill.model) || 'deepseek-chat', skills: [], system: '你是一个乐于助人的智能体。',
         status: 'online', guiPath: '', config: cfg,
       });

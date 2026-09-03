@@ -4,11 +4,30 @@
 //   C class -> BridgeAdapter: file-bridge for closed-source products (§8.1①)
 // Node built-ins (node:fs/node:path) only - still zero EXTERNAL dependencies.
 import { join, isAbsolute } from 'node:path';
-import { readFileSync, writeFileSync, existsSync, mkdirSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, rmSync, readdirSync, statSync, unlinkSync } from 'node:fs';
+import { tmpdir, homedir } from 'node:os';
 import http from 'node:http';
 import { execSync, spawn } from 'node:child_process';
 
 // Pure ESM, zero dependencies, ASCII only.
+
+// Codex desktop app keeps its binary at bin/<hash>/codex.exe and ROTATES the
+// hash dir on every update, so the path must be resolved fresh per spawn,
+// never cached. Returns '' when the app is not installed.
+export function resolveCodexCli() {
+  const base = join(homedir(), 'AppData', 'Local', 'OpenAI', 'Codex', 'bin');
+  let best = '', bestM = 0;
+  try {
+    for (const e of readdirSync(base)) {
+      const exe = join(base, e, 'codex.exe');
+      try {
+        const m = statSync(exe).mtimeMs;
+        if (m > bestM) { bestM = m; best = exe; }
+      } catch { /* dir without codex.exe */ }
+    }
+  } catch { /* no bin dir */ }
+  return best;
+}
 
 // ---------- shared helpers ----------
 function readEnvKey(name) {
@@ -1472,6 +1491,9 @@ export class CliAdapter {
       : String(cfg.cliArgs || '').trim() ? String(cfg.cliArgs).trim().split(/\s+/) : [];
     this.cwd = cfg.cwd && cfg.cwd !== '.' ? cfg.cwd : process.cwd();
     this.maxWaitMs = cfg.timeoutMs || cfg.maxWaitMs || 180000;
+    // e.g. '-o' (codex exec): write the agent's FINAL reply to a temp file so
+    // stream noise (session header / token stats) never leaks into the reply.
+    this.outFileFlag = cfg.outFileFlag || '';
     this._child = null;
   }
 
@@ -1481,6 +1503,7 @@ export class CliAdapter {
 
   ping() {
     if (!this.cliCmd) return false;
+    if (this.cliCmd === 'codex') return !!resolveCodexCli();
     if (/[\\/]/.test(this.cliCmd)) { try { return existsSync(this.cliCmd); } catch { return false; } }
     return true; // bare name -> resolve on PATH at send time
   }
@@ -1513,11 +1536,20 @@ export class CliAdapter {
     const args = hasPlaceholder
       ? this.cliArgs.map((a) => String(a).replace(/\{prompt\}/g, prompt))
       : [...this.cliArgs, prompt];
+    // 'codex' is a dynamic alias: resolve the real exe fresh per call because
+    // the desktop app rotates its bin/<hash> dir on every update.
+    const cmd = this.cliCmd === 'codex' ? resolveCodexCli() : this.cliCmd;
+    if (!cmd) return { text: `[${this.agent.name}] 找不到 codex.exe（OpenAI Codex 桌面版未安装？）` };
+    let tmpFile = '';
+    if (this.outFileFlag) {
+      tmpFile = join(tmpdir(), `achat-cli-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.out`);
+      args.push(this.outFileFlag, tmpFile);
+    }
     if (onEvent) onEvent({ kind: 'step', step: `CLI ${this.cliCmd} 处理中…` });
 
     let child;
     try {
-      child = spawn(this.cliCmd, args, { cwd: this.cwd, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+      child = spawn(cmd, args, { cwd: this.cwd, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
     } catch (e) { return { text: `[${this.agent.name}] 无法启动 CLI：${e.message}` }; }
     this._child = child;
     let out = '', err = '';
@@ -1531,7 +1563,14 @@ export class CliAdapter {
     try {
       const { code, out: stdout, err: stderr } = await done;
       if (signal && signal.aborted) throw new Error('cancelled');
-      const text = (stdout || '').trim() || (stderr || '').trim();
+      // Final-reply file wins when present; raw stdout is the fallback (and
+      // the only path for CLIs without an outfile flag).
+      let text = '';
+      if (tmpFile) {
+        try { text = readFileSync(tmpFile, 'utf8').trim(); } catch { /* no file */ }
+        try { unlinkSync(tmpFile); } catch { /* already gone */ }
+      }
+      if (!text) text = (stdout || '').trim() || (stderr || '').trim();
       return { text: text || (code === 0 ? '(CLI 无输出)' : `CLI 异常退出 code=${code}`) };
     } finally { this._child = null; }
   }

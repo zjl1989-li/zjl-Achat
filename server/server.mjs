@@ -119,18 +119,20 @@ const KNOWN_AGENTS = [
     paths: codexInstallPaths(),
     ports: [],
     prefill: (found) => ({ bridge: 'codex', launcherExe: findMainExe(found.paths, 'codex') }),
-    // Foreign agents must choose how they reach a model; the two answers spawn
-    // different launch chains (see autoLauncher / launchAgent):
+    // Foreign agents must choose how they reach a model; the three answers spawn
+    // different chains (see autoLauncher / launchAgent):
+    //   cli      -> per-turn `codex exec` (G class), model/proxy from ~/.codex/config.toml
     //   official -> straight to the app's own service (user's own account)
     //   proxy    -> chosen proxy software first (see PROXY_APPS), app after ready
     connect: {
       port: 57321,
       modes: [
+        { key: 'cli', label: 'CLI 直连（codex exec）', desc: '每条消息跑一轮 codex exec，模型与代理由 ~/.codex/config.toml 决定（codex++ 本地代理）' },
         { key: 'official', label: '官方账号直连', desc: '用你自己的官方账号，直接拉起 Codex 主程序静默运行' },
         { key: 'proxy', label: '国内代理接入', desc: '先拉起选定的代理软件，就绪后再静默运行 Codex' },
       ],
     },
-    notes: 'OpenAI Codex 桌面版（可经 CC Switch 走国内模型）。接入时会询问连接方式：官方直连或国内代理，启动链路随之不同。',
+    notes: 'OpenAI Codex 桌面版。推荐 CLI 直连（走 ~/.codex/config.toml 配好的模型与代理）；也可官方直连或经代理拉起主程序。',
   },
 ];
 
