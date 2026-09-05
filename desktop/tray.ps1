@@ -134,7 +134,7 @@ $trayCode = { param($root, $node, $winArgs)
 
     $menu = New-Object System.Windows.Forms.ContextMenuStrip
     $openItem = $menu.Items.Add('打开 Tmesh')
-    $openItem.Add_Click({ param($s,$e) Start-Process -FilePath $EDGE -ArgumentList (@("--app=$URL", "--new-window") + $winArgs) })
+    $openItem.Add_Click({ param($s,$e) Start-Process -FilePath $EDGE -ArgumentList (@("--app=$URL", "--new-window") + $(if ($winArgs) { $winArgs } else { @() })) })
 
     $statusItem = $menu.Items.Add("状态：服务运行中（端口 $PORT）")
     $statusItem.Enabled = $false
@@ -153,7 +153,7 @@ $trayCode = { param($root, $node, $winArgs)
     })
 
     $tray.ContextMenuStrip = $menu
-    $tray.Add_DoubleClick({ param($s,$e) Start-Process -FilePath $EDGE -ArgumentList (@("--app=$URL", "--new-window") + $winArgs) })
+    $tray.Add_DoubleClick({ param($s,$e) Start-Process -FilePath $EDGE -ArgumentList (@("--app=$URL", "--new-window") + $(if ($winArgs) { $winArgs } else { @() })) })
     $tray.ShowBalloonTip(3000, 'Tmesh 智能体群聊', '已启动，常驻系统托盘（右键可退出）', 'Info')
 
     # ---- watchdog: auto-relaunch the server if it dies ----
