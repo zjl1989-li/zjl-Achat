@@ -1,6 +1,6 @@
-# zjl-Achat
+# Tmesh
 
-[![CI](https://github.com/zjl1989-li/zjl-Achat/actions/workflows/ci.yml/badge.svg)](https://github.com/zjl1989-li/zjl-Achat/actions/workflows/ci.yml)
+[![CI](https://github.com/zjl1989-li/Tmesh/actions/workflows/ci.yml/badge.svg)](https://github.com/zjl1989-li/Tmesh/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 **把你手上所有的 AI agent 拉进同一个微信群。** DSH、DeepSeek、WorkBuddy/CodeBuddy、MCP server、桌面应用——不管它们开不开 API，都能进群、被 @、交任务、回产物。
@@ -9,7 +9,7 @@
 
 ## 为什么不一样
 
-市面上把 agent 凑在一起的工具，几乎都只接「有官方 API 的」。zjl-Achat 的核心是一套**闭源 agent 桥接层**：
+市面上把 agent 凑在一起的工具，几乎都只接「有官方 API 的」。Tmesh 的核心是一套**闭源 agent 桥接层**：
 
 | 接入面 | 机制 | 例子 |
 |---|---|---|
@@ -39,8 +39,8 @@
 要求：Node.js ≥ 18。无 npm install、无数据库、无 Docker。
 
 ```bash
-git clone https://github.com/zjl1989-li/zjl-Achat.git
-cd zjl-AChat
+git clone https://github.com/zjl1989-li/Tmesh.git
+cd tmesh
 cp .env.example .env   # 按需填入 DEEPSEEK_API_KEY / CODEBUDDY_API_KEY
 node server/server.mjs
 # 打开 http://127.0.0.1:8787

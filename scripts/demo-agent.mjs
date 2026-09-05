@@ -35,7 +35,7 @@ function pickRepo(text) {
 }
 
 async function ghJson(url) {
-  const r = await fetch(url, { headers: { 'User-Agent': 'zjl-achat-bridge', Accept: 'application/vnd.github+json' } });
+  const r = await fetch(url, { headers: { 'User-Agent': 'tmesh-bridge', Accept: 'application/vnd.github+json' } });
   if (!r.ok) throw new Error('HTTP ' + r.status);
   return r.json();
 }

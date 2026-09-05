@@ -191,7 +191,7 @@ function extractOutcome(events) {
   const oc = extractOutcome(spEvents);
   if (oc) console.log("outcome:", JSON.stringify(oc));
 
-  fs.writeFileSync("D:/Projects/zjl-achat/_probe/acp_last_events.json",
+  fs.writeFileSync("D:/Projects/tmesh/_probe/acp_last_events.json",
     JSON.stringify(spEvents, null, 1));
   console.log("\n(saved full events -> _probe/acp_last_events.json)");
 })().catch((e) => { console.error("PROBE ERROR:", e.message); process.exit(2); });

@@ -1,6 +1,6 @@
 // bridge-agent.mjs - headless BeiChen executor for the C-class file bridge.
 //
-// This is the "external product" side of zjl-achat's Bridge Adapter. It runs as
+// This is the "external product" side of tmesh's Bridge Adapter. It runs as
 // a standalone, always-on node process (NOT a GUI window, NOT a model mock):
 //   1. poll  bridge/<agentId>/inbox  for tasks written by achat
 //   2. run a real LLM tool-call loop (DeepSeek) that actually does the work
@@ -56,7 +56,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function ghSearch(q) {
   const url = `https://api.github.com/search/repositories?q=${encodeURIComponent(q)}&sort=stars&order=desc&per_page=5`;
-  const res = await fetch(url, { headers: { 'User-Agent': 'zjl-achat-bridge', Accept: 'application/vnd.github+json' } });
+  const res = await fetch(url, { headers: { 'User-Agent': 'tmesh-bridge', Accept: 'application/vnd.github+json' } });
   if (!res.ok) return `GitHub search failed (${res.status}). Try a different query.`;
   const j = await res.json();
   if (!j.items || !j.items.length) return 'No repositories found. Refine the query.';
@@ -68,7 +68,7 @@ async function ghSearch(q) {
 }
 
 async function ghRepo(fullName) {
-  const res = await fetch(`https://api.github.com/repos/${fullName}`, { headers: { 'User-Agent': 'zjl-achat-bridge', Accept: 'application/vnd.github+json' } });
+  const res = await fetch(`https://api.github.com/repos/${fullName}`, { headers: { 'User-Agent': 'tmesh-bridge', Accept: 'application/vnd.github+json' } });
   if (!res.ok) return `Cannot fetch ${fullName} (${res.status}).`;
   const r = await res.json();
   const meta = {
@@ -87,7 +87,7 @@ async function ghRepo(fullName) {
 
 async function webFetch(url) {
   try {
-    const res = await fetch(url, { headers: { 'User-Agent': 'zjl-achat-bridge' }, redirect: 'follow' });
+    const res = await fetch(url, { headers: { 'User-Agent': 'tmesh-bridge' }, redirect: 'follow' });
     if (!res.ok) return `Fetch failed (${res.status}) for ${url}`;
     const txt = await res.text();
     return txt.slice(0, 8000);
@@ -247,7 +247,7 @@ async function handleTask(taskId) {
   try {
     const result = await runTask(task);
     writeFileSync(join(OUTBOX, `${taskId}.result.json`), JSON.stringify({
-      schema: 'zjl-achat-bridge/1',
+      schema: 'tmesh-bridge/1',
       conclusion: result.summary,
       artifacts: result.artifacts,
     }, null, 2), 'utf8');
@@ -256,7 +256,7 @@ async function handleTask(taskId) {
   } catch (e) {
     console.error(`[bridge-agent] task ${taskId} error: ${e.message}`);
     writeFileSync(join(OUTBOX, `${taskId}.result.json`), JSON.stringify({
-      schema: 'zjl-achat-bridge/1',
+      schema: 'tmesh-bridge/1',
       conclusion: `[WorkBuddy] 执行出错：${e.message}`,
       artifacts: [],
     }, null, 2), 'utf8');

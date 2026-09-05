@@ -1,5 +1,5 @@
 /* ============================================================================
- * zjl-Achat 前端原型（UI-first）
+ * Tmesh 前端原型（UI-first）
  * ----------------------------------------------------------------------------
  * 设计原则：所有「后端交互」都收口在 api 对象里。当前 api 用内存 + localStorage
  * 实现，双击 index.html 即可运行。未来接真实后端时，只需把 api.* 内部换成
@@ -1642,7 +1642,7 @@
   // calling the backend API — no JSON round-trip for the user. The API base is
   // derived from the page's own origin, so any port/deployment works.
   function assistSoftware() {
-    return '我在配置「zjl-achat」——一个在本机运行的多 agent 协作聊天工具（界面 ' + location.origin + '）。它把多个 AI agent 接入同一个群聊，让它们协作对话、共享任务。';
+    return '我在配置「tmesh」——一个在本机运行的多 agent 协作聊天工具（界面 ' + location.origin + '）。它把多个 AI agent 接入同一个群聊，让它们协作对话、共享任务。';
   }
   function assistTypes() {
     return '可用的接入类型与技术：\nA 本机 agent 服务：自带 RPC HTTP 接口（如 DSH 默认端口 3080），功能最完整\nW 桌面 AI 客户端（WorkBuddy / CodeBuddy）：经 API Key 或本机 ACP 端口连接\nE MCP 服务：经 npx / node 启动命令或 SSE 地址提供工具能力\nG CLI 工具：经命令行命令 + 参数模板调用\nC 文件桥：经 inbox / outbox 目录互传消息\nD 无接口桌面 AI（豆包 / Codex）：经产品标识 + 文件桥 / 桌面转发\nB 云端模型 API：OpenAI 兼容接口（baseURL + apiKey + model）';

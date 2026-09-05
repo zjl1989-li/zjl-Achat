@@ -1,4 +1,4 @@
-// zjl-Achat desktop entry (zero-dep).
+// Tmesh desktop entry (zero-dep).
 // One-click flow: ensure the achat server (incl. DSH + beichen-bridge
 // launchers) is up, then open the UI in a standalone Edge "--app" window
 // (native app window, NOT a browser tab). No Electron, no extra deps.

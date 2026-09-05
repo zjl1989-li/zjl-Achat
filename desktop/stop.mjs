@@ -1,4 +1,4 @@
-// Stop the zjl-Achat server (the desktop entry only starts it; the Edge
+// Stop the Tmesh server (the desktop entry only starts it; the Edge
 // window is closed by the user). Zero-dep.
 import { execSync } from 'node:child_process';
 

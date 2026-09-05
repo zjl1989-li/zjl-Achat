@@ -14,7 +14,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 
-const REPO = 'zjl1989-li/zjl-Achat';
+const REPO = 'zjl1989-li/Tmesh';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const CACHE_MS = 5 * 60 * 1000;
@@ -48,7 +48,7 @@ export function compareSemver(a, b) {
 export async function checkLatest() {
   if (_cache && Date.now() - _cacheAt < CACHE_MS) return _cache;
   const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
-    headers: { 'User-Agent': 'zjl-Achat', Accept: 'application/vnd.github+json' },
+    headers: { 'User-Agent': 'Tmesh', Accept: 'application/vnd.github+json' },
     signal: AbortSignal.timeout(8000),
   });
   if (!res.ok) throw new Error(`GitHub API ${res.status}`);

@@ -548,7 +548,7 @@ export class BridgeAdapter {
   // (role/roster/peers/answerTo); the bridge ferries it verbatim.
   buildTask({ messages, peers, roster, answerTo, convId, recall }) {
     return {
-      schema: 'zjl-achat-bridge/1',
+      schema: 'tmesh-bridge/1',
       agentId: this.agent.id,
       instruction: lastUserText(messages),
       role: this.agent.system || '',
@@ -1318,7 +1318,7 @@ export class McpClient {
     await this.request('initialize', {
       protocolVersion: '2024-11-05',
       capabilities: {},
-      clientInfo: { name: 'zjl-achat', version: '1.0.0' },
+      clientInfo: { name: 'tmesh', version: '1.0.0' },
     });
     await this.notify('notifications/initialized', {});
   }

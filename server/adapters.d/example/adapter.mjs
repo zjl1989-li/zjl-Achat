@@ -1,4 +1,4 @@
-// Example plugin adapter for zjl-AChat.
+// Example plugin adapter for tmesh.
 //
 // The contract is the same as every built-in adapter class:
 //   constructor(agent)      - read agent.config, keep a reference

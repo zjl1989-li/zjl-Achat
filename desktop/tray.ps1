@@ -1,4 +1,4 @@
-﻿# zjl-Achat system tray manager (v2rayN-style).
+﻿# Tmesh system tray manager (v2rayN-style).
 # UI strings are Chinese; save this file as UTF-8 WITH BOM so Windows
 # PowerShell 5.1 reads it correctly (no BOM = GBK mojibake in menus).
 # Desktop shortcut runs this. It starts the achat server + opens the native
@@ -118,11 +118,11 @@ $trayCode = { param($root, $node)
 
     $tray = New-Object System.Windows.Forms.NotifyIcon
     $tray.Icon = $icon
-    $tray.Text = 'zjl-Achat 智能体群聊'
+    $tray.Text = 'Tmesh 智能体群聊'
     $tray.Visible = $true
 
     $menu = New-Object System.Windows.Forms.ContextMenuStrip
-    $openItem = $menu.Items.Add('打开 zjl-Achat')
+    $openItem = $menu.Items.Add('打开 Tmesh')
     $openItem.Add_Click({ param($s,$e) Start-Process -FilePath $EDGE -ArgumentList "--app=$URL","--new-window" })
 
     $statusItem = $menu.Items.Add("状态：服务运行中（端口 $PORT）")
@@ -143,7 +143,7 @@ $trayCode = { param($root, $node)
 
     $tray.ContextMenuStrip = $menu
     $tray.Add_DoubleClick({ param($s,$e) Start-Process -FilePath $EDGE -ArgumentList "--app=$URL","--new-window" })
-    $tray.ShowBalloonTip(3000, 'zjl-Achat 智能体群聊', '已启动，常驻系统托盘（右键可退出）', 'Info')
+    $tray.ShowBalloonTip(3000, 'Tmesh 智能体群聊', '已启动，常驻系统托盘（右键可退出）', 'Info')
 
     # ---- watchdog: auto-relaunch the server if it dies ----
     # Runs as a WinForms Timer on the tray UI thread (safe with Application.Run).

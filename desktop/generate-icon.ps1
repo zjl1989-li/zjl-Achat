@@ -1,10 +1,10 @@
-# generate-icon.ps1 - draw the zjl-Achat 3-circle icon (deep theme) with GDI+,
+# generate-icon.ps1 - draw the Tmesh 3-circle icon (deep theme) with GDI+,
 # emit multi-size PNGs + a multi-size ICO (Vista PNG-compressed format).
 # Pure .NET, no external deps. Colors match docs/icon-r2-tri-color.svg.
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 
-$ROOT = 'D:/Projects/zjl-achat'
+$ROOT = 'D:/Projects/tmesh'
 
 function New-IconBitmap([int]$S) {
   $bmp = New-Object System.Drawing.Bitmap($S, $S)

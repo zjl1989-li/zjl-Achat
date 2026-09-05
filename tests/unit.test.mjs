@@ -1,4 +1,4 @@
-// node:test unit/integration suite for zjl-Achat core.
+// node:test unit/integration suite for Tmesh core.
 // Zero dependencies: node:test + node:assert only. ASCII only.
 // Isolation: copies server/ + public/ into a per-run temp dir (excluding the
 // real data.json / avatars / logs), so production data is never touched.

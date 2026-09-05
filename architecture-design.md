@@ -1,6 +1,6 @@
-# zjl-Achat 架构设计方案
+# Tmesh 架构设计方案
 
-> 项目代号：`zjl-Achat`（目录 / npm 包名 `zjl-achat`）
+> 项目代号：`Tmesh`（目录 / npm 包名 `tmesh`）
 > 版本：v1.0 草稿 · 日期：2026-08-31
 > 定位：本地优先的多 agent 统一协作管理平台（"agent 群聊枢纽"）
 > 状态：设计阶段，未进入编码（DSH 接入验证已通过，详见 §7.3）
@@ -51,7 +51,7 @@
 ## 3. 设计原则
 
 1. **本地优先**：所有 agent 运行在本机，数据不出本机（除明确走云模型 API 的 Model 类）。
-2. **单窗口**：zjl-Achat 是唯一可见窗口；各 agent 由生命周期层在后台静默拉起/隐藏。
+2. **单窗口**：Tmesh 是唯一可见窗口；各 agent 由生命周期层在后台静默拉起/隐藏。
 3. **适配层抽象**：总线只认 `AgentAdapter` 统一接口，不关心背后是 DSH、豆包还是WorkBuddy。
 4. **自动选型**：给定 agent 的接入描述，能力探针自动判定走哪类适配器，用户不手动选。
 5. **保真度分级**：真 agent（A/E/F 类）直连拿最高保真度；闭源（C/D 类）用桥接绕行，诚实标注降级的零件。
@@ -155,27 +155,27 @@ AgentAdapter {
 }
 ```
 
-### 6.2.1 会话镜像 Session Mirror（核心修正：zjl-Achat 不是 agent 的宿主）
+### 6.2.1 会话镜像 Session Mirror（核心修正：Tmesh 不是 agent 的宿主）
 
-> **关键认知（2026-08-31 产品负责人纠正）**：进群的 agent 不是 zjl-Achat 的私有 agent，它们各自是独立的 app（DSH / WorkBuddy / 豆包 / …）。我们只是桥接了它们的一部分能力进来。**当桥接的能力不足以完成项目需求时，用户仍会回各自的主窗口去调**；此时主窗口里也必须带着该项目的上下文，否则桥接与回窗口之间就断了。
+> **关键认知（2026-08-31 产品负责人纠正）**：进群的 agent 不是 Tmesh 的私有 agent，它们各自是独立的 app（DSH / WorkBuddy / 豆包 / …）。我们只是桥接了它们的一部分能力进来。**当桥接的能力不足以完成项目需求时，用户仍会回各自的主窗口去调**；此时主窗口里也必须带着该项目的上下文，否则桥接与回窗口之间就断了。
 
 **两种实现路径**：
-- **A. pull-from-hub（主机制，2026-08-31 产品负责人提出）**：把上下文的**真源收归 zjl-Achat 自己**——群空间新增「上下文」标签（见 §6.5 Context Hub），集中保存本群所有原始上下文资料。开单 agent 会话（私信 / 拉起主窗口）时，由 zjl-Achat 先把这份上下文整包喂给该 agent，让它「先读再做」。**不依赖任何原生 app 配合，对 A~F 六类全通**。
+- **A. pull-from-hub（主机制，2026-08-31 产品负责人提出）**：把上下文的**真源收归 Tmesh 自己**——群空间新增「上下文」标签（见 §6.5 Context Hub），集中保存本群所有原始上下文资料。开单 agent 会话（私信 / 拉起主窗口）时，由 Tmesh 先把这份上下文整包喂给该 agent，让它「先读再做」。**不依赖任何原生 app 配合，对 A~F 六类全通**。
 - **B. push-to-native（可选优化，§6.2.1-a）**：建群时让原生 app 主动建带上下文的会话。仅对少数开放会话 API 的 app 成立，作为体验增强，非必需。
 
 > 结论：Context Hub 是必需主机制，Session Mirror 仅锦上添花。两者可叠加（支持原生会话的 agent 既能 pull 也能 mirror）。
 
 ### 6.2.1-a Session Mirror（push-to-native，可选优化）
 
-**定义（仅作为 A 类路径的体验增强）**：在 zjl-Achat 建群时，适配器**额外**在该 agent 自己的运行时里创建一个对应的原生会话（seed 项目简介 / 目标 / 关键约束），映射 `groupId -> { agentId: nativeSessionId }` 存进 store。右键"🪟拉起主窗口"时 `openNativeSession(id)` 直接定位。原生 app 支持则体验更顺，不支持也不影响上下文传递（见 §6.5，上下文始终由 Context Hub 注入）。
+**定义（仅作为 A 类路径的体验增强）**：在 Tmesh 建群时，适配器**额外**在该 agent 自己的运行时里创建一个对应的原生会话（seed 项目简介 / 目标 / 关键约束），映射 `groupId -> { agentId: nativeSessionId }` 存进 store。右键"🪟拉起主窗口"时 `openNativeSession(id)` 直接定位。原生 app 支持则体验更顺，不支持也不影响上下文传递（见 §6.5，上下文始终由 Context Hub 注入）。
 
 **交互闭环**：
 ```
-zjl-Achat 建群 ──► 对每个成员 agent（仅 hasNativeSession=true 时）：
+Tmesh 建群 ──► 对每个成员 agent（仅 hasNativeSession=true 时）：
         │            adapter.createNativeSession(projectCtx) ──► 原生 app 里生成会话 X
         │            store 存 groupId→{agentId: 会话X}
         ▼
-用户在 zjl-Achat 桥接区协作（部分能力）
+用户在 Tmesh 桥接区协作（部分能力）
         │ （能力不足 / 需深度调整）
         ▼
 右键 "🪟拉起主窗口" ──► adapter.openNativeSession(会话X)  // 可选直达，无则退回 Context Hub 注入
@@ -210,14 +210,14 @@ zjl-Achat 建群 ──► 对每个成员 agent（仅 hasNativeSession=true 时
 - `decisions`：从对话中提炼的关键结论（可手动标记「设为决策」）；
 - `updatedAt`。
 
-**为什么它比 Session Mirror 更稳**：上下文真源在 zjl-Achat 自己手里，开单 agent 会话时由我们**主动整包注入**——无论该 agent 是 A/B/C/D/E/F 哪一类，都只要「接收一段文本/文件」就能获得上下文，**零原生配合要求**。Session Mirror 那套「求原生 app 建会话」只在少数 app 上可行，因此降为体验优化。
+**为什么它比 Session Mirror 更稳**：上下文真源在 Tmesh 自己手里，开单 agent 会话时由我们**主动整包注入**——无论该 agent 是 A/B/C/D/E/F 哪一类，都只要「接收一段文本/文件」就能获得上下文，**零原生配合要求**。Session Mirror 那套「求原生 app 建会话」只在少数 app 上可行，因此降为体验优化。
 
 **开单 agent 会话时的上下文注入流程**：
 ```
 用户右键 agent X「🪟拉起主窗口」或「✉ 私信」
         │
         ▼
-zjl-Achat 组装 contextPackage = brief + sources + decisions（来自该群 ContextHub）
+Tmesh 组装 contextPackage = brief + sources + decisions（来自该群 ContextHub）
         │
         ├─► A/E/F（有 API/MCP/协议）：作为首条 system/user 消息或 session seed 注入
         ├─► B（模型级）：拼进 system prompt 首条
@@ -374,7 +374,7 @@ M2 **不是 DSH 专属**，而是所有设置了 `config.launcher.enabled` 的�
 
 **实测结果**：托管 node22 + `DSH_HOME=D:/DSHHome` + `NODE_PATH` 指向 asar 解包 node_modules，跑 `dsh/lib/bin.js --profile web`，**3 秒内无窗口拉起，监听 `127.0.0.1:3080`**（启动日志 `dsh web: http://127.0.0.1:3080`），结束后进程已 kill。
 
-**结论**：DSH 能当真 agent 无窗口进群，完全满足硬要求；是 zjl-Achat 第一优先真接入对象。
+**结论**：DSH 能当真 agent 无窗口进群，完全满足硬要求；是 Tmesh 第一优先真接入对象。
 
 ### 7.4 DSH API Adapter 协议实测（2026-08-31 ✅）
 
@@ -448,7 +448,7 @@ achat 侧 `BridgeAdapter`（server/adapters.mjs）实现 §6.2 统一接口；�
 **下发（achat → 产品）**：`localDir/inbox/<taskId>.json`
 ```
 {
-  "schema": "zjl-achat-bridge/1",
+  "schema": "tmesh-bridge/1",
   "agentId": "beichen-bridge",
   "instruction": "<用户最新一句话 / 本轮回答内容>",
   "role": "<agent.system 人设>",
@@ -547,7 +547,7 @@ POST /api/v1/acp  (JSON-RPC 2.0) + 头 acp-connection-id / acp-session-token
 | 指令 | 结果 |
 |---|---|
 | 请只回复「桥接成功」 | ✅ 真WorkBuddy回「桥接成功」 |
-| 读 `package.json` 的 name 字段 | ✅ **真实读到**并回「zjl-achat（v0.0.1…）」——非编造，真读文件 |
+| 读 `package.json` 的 name 字段 | ✅ **真实读到**并回「tmesh（v0.0.1…）」——非编造，真读文件 |
 | 读 `.env` | ⛔ 被 achat 护栏拦截（敏感凭据文件） |
 | 运行 `wmic cpu get name` | ⛔ 被 achat 护栏拦截（系统级命令） |
 
@@ -602,7 +602,7 @@ POST /api/v1/acp  (JSON-RPC 2.0) + 头 acp-connection-id / acp-session-token
 
 ##### live 验收（2026-09-02 ✅ 通过，产品负责人提供真 key）
 
-**结果**：群 `mtjokg0se8od3i [workbuddy]` 投递「读当前目录 package.json 的 name/version 真实值」→ **5 秒回复** `name=zjl-achat, version=0.0.1`，与文件实际内容逐字一致（非幻觉）。反向安全验证：要求读 `.env` → 被 `guardrail()` 拦截、未转发给 CLI。**cli-key 通路的对话能力 + 文件工具能力 + 护栏 三者同时确认为真。**
+**结果**：群 `mtjokg0se8od3i [workbuddy]` 投递「读当前目录 package.json 的 name/version 真实值」→ **5 秒回复** `name=tmesh, version=0.0.1`，与文件实际内容逐字一致（非幻觉）。反向安全验证：要求读 `.env` → 被 `guardrail()` 拦截、未转发给 CLI。**cli-key 通路的对话能力 + 文件工具能力 + 护栏 三者同时确认为真。**
 
 裸 CLI 单次调用实测：`duration_ms=2972`，`input_tokens=23512 / output_tokens=7`。⚠️ 输入 token 偏高是因为 CLI 每次都装载完整系统提示 + 工具表；纯闲聊场景可用 `--tools ""` 砍掉工具表省 token（代价是失去文件能力，未默认开）。
 
@@ -636,7 +636,7 @@ POST /api/v1/acp  (JSON-RPC 2.0) + 头 acp-connection-id / acp-session-token
 **脚本来源**：`scripts/` 下 `capability-probe` / `session-visibility-probe` / `approve-loop` / `approve-via-post` / `approve-verbose` / `approve-then-resume` / `duplex-perm-test` / `duplex-http` / `main-approve-loop` / `probe-methods` / `init-discover` / `asar-*`（diag/find/dump/extract/fix/ls/read）。DSH 为摸清 achat 如何驱动 WorkBuddy ACP 而主动安排，等于"第三方 agent 测第三方 agent"，把边界踩实。
 
 **结论一：headless 会话能力为真，但 UI 不可见（呼应 §8.6.1「隐形非无会话」）**
-- `capability-probe.mjs`：令 ACP 实例读 `D:/Projects/zjl-achat/package.json` 的 name 字段；脚本逐行解析 `agent_message_chunk` + `tool_use` 事件，确证 WorkBuddy **真调了文件工具、真读到了 name=“zjl-achat”**（非编造）。
+- `capability-probe.mjs`：令 ACP 实例读 `D:/Projects/tmesh/package.json` 的 name 字段；脚本逐行解析 `agent_message_chunk` + `tool_use` 事件，确证 WorkBuddy **真调了文件工具、真读到了 name=“tmesh”**（非编造）。
 - `session-visibility-probe.mjs`：对新建会话试 `session/list|find|get|read|list_recents`——**绝大多数返回 `-32601 method not found`**（不存在枚举接口）；再发测试 prompt 看 UI 是否反应，用以证"驱动成功但 UI 无新会话"是 headless **隐形**，非"无会话"。
 - 组合结论：ACP 提供的是**后端驱动面**，**不暴露会话枚举、不在 UI 渲染标签页**；achat 要的正是这个"后台真身会话"，UI 可见性不是必要条件。
 
@@ -784,7 +784,7 @@ openDM(agentId)              // 私信会话
 ## 附：与 Mnemo 的关系
 
 - Mnemo 已**搁置**，非删除，代码可作参考（尤其写入归属 / 可见性门控函数）。
-- zjl-Achat 是产品本体；记忆能力若未来需要，可作为某个 agent（如WorkBuddy扮演）的能力，而非独立基础设施。
+- Tmesh 是产品本体；记忆能力若未来需要，可作为某个 agent（如WorkBuddy扮演）的能力，而非独立基础设施。
 
 ---
 
@@ -910,7 +910,7 @@ after 列目录: {"read":1,"glob":1,"pwsh":1}
 ### 启动方式
 
 ```powershell
-cd D:\Projects\zjl-achat
+cd D:\Projects\tmesh
 powershell -ExecutionPolicy Bypass -File .\start.ps1
 ```
 

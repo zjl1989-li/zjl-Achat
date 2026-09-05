@@ -1,4 +1,4 @@
-// zjl-Achat backend: static server + REST + SSE + group coordinator.
+// Tmesh backend: static server + REST + SSE + group coordinator.
 // Zero dependencies, pure Node ESM. ASCII only.
 import http from 'node:http';
 import { readFileSync, existsSync, writeFileSync, mkdirSync, statSync, renameSync, unlinkSync, readdirSync, rmSync } from 'node:fs';
@@ -73,7 +73,7 @@ function releaseLock() {
   } catch { /* ignore */ }
 }
 if (!acquireLock()) {
-  console.error(`zjl-Achat is already running (pid lock: ${LOCK_FILE}). Exiting.`);
+  console.error(`Tmesh is already running (pid lock: ${LOCK_FILE}). Exiting.`);
   process.exit(1);
 }
 process.on('exit', releaseLock);
@@ -1531,7 +1531,7 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, '127.0.0.1', async () => {
-  console.log(`zjl-Achat on http://localhost:${PORT}`);
+  console.log(`Tmesh on http://localhost:${PORT}`);
   // Import plugin adapter modules once so createAdapter() can stay synchronous.
   // A broken plugin logs and is skipped inside warmPlugins, never fatal.
   const ids = await warmPlugins();
