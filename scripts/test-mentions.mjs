@@ -4,7 +4,7 @@
 import { parseMentions } from '../server/bus.mjs';
 
 const AGENTS = [
-  { id: 'beichen', name: '北辰' },
+  { id: 'beichen', name: 'WorkBuddy' },
   { id: 'dsh', name: 'DSH' },
   { id: 'invest', name: '投资研究' },
   { id: 'short', name: '投资' },   // deliberately shadows part of 投资研究
@@ -25,11 +25,11 @@ const check = (label, got, want) => {
     : `FAIL  ${label}\n      got  ${JSON.stringify(got)}\n      want ${JSON.stringify(want)}`);
 };
 
-check('by name',        parseMentions('@北辰 帮我看看', AGENTS, MEMBERS), ['beichen']);
+check('by name',        parseMentions('@WorkBuddy 帮我看看', AGENTS, MEMBERS), ['beichen']);
 check('by id',          parseMentions('@dsh 跑一下', AGENTS, MEMBERS), ['dsh']);
 check('case-insensitive', parseMentions('@DSH 跑一下', AGENTS, MEMBERS), ['dsh']);
-check('two mentions',   parseMentions('@北辰 @DSH 开会', AGENTS, MEMBERS), ['beichen', 'dsh']);
-check('deduped',        parseMentions('@北辰 和 @北辰', AGENTS, MEMBERS), ['beichen']);
+check('two mentions',   parseMentions('@WorkBuddy @DSH 开会', AGENTS, MEMBERS), ['beichen', 'dsh']);
+check('deduped',        parseMentions('@WorkBuddy 和 @WorkBuddy', AGENTS, MEMBERS), ['beichen']);
 
 // The whole reason for longest-first matching: "投资" must not eat "投资研究".
 check('longest name wins', parseMentions('@投资研究 说说', AGENTS, MEMBERS), ['invest']);
@@ -41,7 +41,7 @@ check('decorator ignored', parseMentions('@app.route("/x")', AGENTS, MEMBERS), [
 check('non-member ignored', parseMentions('@陌生人 你好', AGENTS, MEMBERS), []);
 
 // A member outside this group must not be routed to.
-check('outside member ignored', parseMentions('@北辰 在吗', AGENTS, ['dsh', 'invest']), []);
+check('outside member ignored', parseMentions('@WorkBuddy 在吗', AGENTS, ['dsh', 'invest']), []);
 check('empty text', parseMentions('', AGENTS, MEMBERS), []);
 check('null text', parseMentions(null, AGENTS, MEMBERS), []);
 

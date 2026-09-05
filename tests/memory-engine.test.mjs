@@ -11,7 +11,7 @@ import { distillConv, distillMessage } from '../server/memory/distill.mjs';
 import { createKnowledge } from '../server/memory/knowledge.mjs';
 
 const agents = [
-  { id: 'a1', name: '北辰' },
+  { id: 'a1', name: 'WorkBuddy' },
   { id: 'a2', name: 'DSH' },
 ];
 
@@ -52,7 +52,7 @@ test('distill: whole-conversation digest covers seats, asks, artifacts', () => {
   ]);
   const note = distillConv(conv, agents);
   assert.match(note.title, /群档-测试群/);
-  assert.ok(note.body.includes('北辰'));
+  assert.ok(note.body.includes('WorkBuddy'));
   assert.ok(note.body.includes('DSH'));
   assert.ok(note.body.includes('要不要上 CI'));
   assert.ok(note.body.includes('ci.yml'));
@@ -63,7 +63,7 @@ test('distill: single message pin keeps speaker and timestamp', () => {
   const conv = convOf([{ sender: 'agent', agentId: 'a1', text: '最终决定：采用零依赖方案。', ts }]);
   const note = distillMessage(conv, conv.messages[0], agents);
   assert.match(note.title, /群档-测试群-摘录/);
-  assert.ok(note.body.includes('北辰'));
+  assert.ok(note.body.includes('WorkBuddy'));
   assert.ok(note.body.includes('零依赖方案'));
   assert.ok(note.body.includes('时间：'));
 });

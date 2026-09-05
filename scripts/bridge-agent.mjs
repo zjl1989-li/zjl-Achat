@@ -164,7 +164,7 @@ async function callLLM(messages) {
 async function runTask(task) {
   writtenArtifacts.clear();
   const system = (task.role || '') +
-    '\n\n你是北辰，一个能调用真实工具的智能体。请先理解用户任务，必要时调用工具收集真实数据，' +
+    '\n\n你是WorkBuddy，一个能调用真实工具的智能体。请先理解用户任务，必要时调用工具收集真实数据，' +
     '生成高质量交付物（如分析报告），最后务必调用 finish 工具结束并给出总结。报告要有真实数据和明确结论，不要编造。';
   const messages = [
     { role: 'system', content: system },
@@ -257,7 +257,7 @@ async function handleTask(taskId) {
     console.error(`[bridge-agent] task ${taskId} error: ${e.message}`);
     writeFileSync(join(OUTBOX, `${taskId}.result.json`), JSON.stringify({
       schema: 'zjl-achat-bridge/1',
-      conclusion: `[北辰] 执行出错：${e.message}`,
+      conclusion: `[WorkBuddy] 执行出错：${e.message}`,
       artifacts: [],
     }, null, 2), 'utf8');
   } finally {

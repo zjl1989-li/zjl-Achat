@@ -52,7 +52,7 @@
 
 1. **本地优先**：所有 agent 运行在本机，数据不出本机（除明确走云模型 API 的 Model 类）。
 2. **单窗口**：zjl-Achat 是唯一可见窗口；各 agent 由生命周期层在后台静默拉起/隐藏。
-3. **适配层抽象**：总线只认 `AgentAdapter` 统一接口，不关心背后是 DSH、豆包还是北辰。
+3. **适配层抽象**：总线只认 `AgentAdapter` 统一接口，不关心背后是 DSH、豆包还是WorkBuddy。
 4. **自动选型**：给定 agent 的接入描述，能力探针自动判定走哪类适配器，用户不手动选。
 5. **保真度分级**：真 agent（A/E/F 类）直连拿最高保真度；闭源（C/D 类）用桥接绕行，诚实标注降级的零件。
 6. **UI 沿用惯例**：三栏式直接套用 agent 类产品既有 UI（WorkBuddy / DSH / ChatGPT 桌面 / Claude 桌面），不重造。
@@ -129,7 +129,7 @@ pending → processing → done | failed
 | **A 自托管运行时** | 本地/自托管 HTTP API（含 SSE） | DSH(3080)、n8n、Dify、FastGPT、Flowise、LangGraph Platform、自研 | AutoGen/CrewAI 部署版 | **API Adapter**（直调，保真度最高=真 agent） |
 | **B 模型 API 商** | OpenAI 兼容 chat | DeepSeek、通义(Qwen)、豆包(火山方舟)、智谱GLM、Kimi、文心、讯飞、腾讯混元、MiniMax、零一、阶跃 | OpenAI、Claude、Gemini、Groq | **Model Adapter**（baseURL+key 切换，你给 prompt+tools 扮演，L1） |
 | **C 闭源云产品** | 只有网页/App，无开放 API | 豆包App、Kimi、通义App、文心、智谱清言、Coze(扣子)云、Copilot | ChatGPT web、Claude web、Gemini web | **Bridge Adapter**（文件桥/IM/UI 自动化 包其输入输出，绕行，L1.5） |
-| **D 桌面 GUI** | Electron 等无 API 但可常驻 | 北辰/WorkBuddy 桌面、DSH 桌面壳、通义/豆包桌面版 | ChatGPT 桌面、Claude 桌面 | **Launch+File Adapter**（headless 起 或 隐藏窗口+文件桥；DSH 实际走 A） |
+| **D 桌面 GUI** | Electron 等无 API 但可常驻 | WorkBuddy/WorkBuddy 桌面、DSH 桌面壳、通义/豆包桌面版 | ChatGPT 桌面、Claude 桌面 | **Launch+File Adapter**（headless 起 或 隐藏窗口+文件桥；DSH 实际走 A） |
 | **E MCP agent** | 暴露 MCP server | DSH(插件)、各类 MCP 工具服务 | Claude Desktop MCP | **MCP Adapter**（标准协议） |
 | **F 协议原生** | 遵循 A2A / AG-UI | （生态早期） | A2A Agent Card、AG-UI 事件流 | **Protocol Adapter**（最接近真窗口渲染） |
 
@@ -157,7 +157,7 @@ AgentAdapter {
 
 ### 6.2.1 会话镜像 Session Mirror（核心修正：zjl-Achat 不是 agent 的宿主）
 
-> **关键认知（2026-08-31 产品负责人纠正）**：进群的 agent 不是 zjl-Achat 的私有 agent，它们各自是独立的 app（DSH / 北辰 / 豆包 / …）。我们只是桥接了它们的一部分能力进来。**当桥接的能力不足以完成项目需求时，用户仍会回各自的主窗口去调**；此时主窗口里也必须带着该项目的上下文，否则桥接与回窗口之间就断了。
+> **关键认知（2026-08-31 产品负责人纠正）**：进群的 agent 不是 zjl-Achat 的私有 agent，它们各自是独立的 app（DSH / WorkBuddy / 豆包 / …）。我们只是桥接了它们的一部分能力进来。**当桥接的能力不足以完成项目需求时，用户仍会回各自的主窗口去调**；此时主窗口里也必须带着该项目的上下文，否则桥接与回窗口之间就断了。
 
 **两种实现路径**：
 - **A. pull-from-hub（主机制，2026-08-31 产品负责人提出）**：把上下文的**真源收归 zjl-Achat 自己**——群空间新增「上下文」标签（见 §6.5 Context Hub），集中保存本群所有原始上下文资料。开单 agent 会话（私信 / 拉起主窗口）时，由 zjl-Achat 先把这份上下文整包喂给该 agent，让它「先读再做」。**不依赖任何原生 app 配合，对 A~F 六类全通**。
@@ -192,11 +192,11 @@ zjl-Achat 建群 ──► 对每个成员 agent（仅 hasNativeSession=true 时
 | **E MCP agent** | ✅ 若 MCP 暴露会话 | 经 MCP 建 session | ⚠️ 取决于 host |
 | **F 协议原生（A2A/AG-UI）** | ✅ 设计内建 | Agent Card Task 即原生会话 | ✅ |
 | **D 桌面 GUI（DSH 桌面壳）** | ✅（同 A 后端） | 同上 | ✅ |
-| **D 桌面 GUI（北辰/WorkBuddy 桌面）** | ❌ 无 API | 只能 UI 自动化点"新对话"且无法干净 seed 上下文 | 🚫 仅能开空白窗口 |
+| **D 桌面 GUI（WorkBuddy/WorkBuddy 桌面）** | ❌ 无 API | 只能 UI 自动化点"新对话"且无法干净 seed 上下文 | 🚫 仅能开空白窗口 |
 | **B 模型级（DeepSeek/豆包 API）** | ❌ 无原生窗口 | 它就是裸 API，没有"app 会话"概念 | 不适用（无主窗口可拉） |
 | **C 闭源云（豆包/ChatGPT web）** | ⚠️ 极难 | 需 UI 自动化点击"新对话"+粘贴首条上下文，脆弱 | 🚫 仅能开网页（若做） |
 
-**降级策略**：`hasNativeSession=false` 的 agent（B / C / 北辰桌面），建群时 `createNativeSession` 返回 `null`，UI 上"🪟拉起主窗口"对该 agent 的「直达会话」降级为「开新会话 + 首条注入 Context Hub 上下文」（见 §6.5）——**不假装能镜像，但上下文照样不丢**。
+**降级策略**：`hasNativeSession=false` 的 agent（B / C / WorkBuddy桌面），建群时 `createNativeSession` 返回 `null`，UI 上"🪟拉起主窗口"对该 agent 的「直达会话」降级为「开新会话 + 首条注入 Context Hub 上下文」（见 §6.5）——**不假装能镜像，但上下文照样不丢**。
 
 **对 store 的影响**：`groups[].sessions` 字段 = `{ [agentId]: nativeSessionId | null }`，建群时由适配器填充（null 即不支持）；真正的上下文真源在 `groups[].context`（§6.5 / §9.1），与镜像解耦。
 
@@ -318,7 +318,7 @@ DSH 归 A 类。桌面版与 Web 版背后是同一份 harness 后端，适配�
 | 策略 | 适用 | 怎么做到无窗口 | 干净度 |
 |---|---|---|---|
 | ① 后台服务/API 模式 | 自带 server/MCP/CLI 的 agent | `spawn` 成无界面进程，监听本地端口 | ✅ 最干净 |
-| ② 隐藏窗口 + 文件桥 | 桌面 Electron（DSH/北辰类） | 启动时最小化到托盘/隐藏，靠读目录收发 | ⚠️ 通用兜底 |
+| ② 隐藏窗口 + 文件桥 | 桌面 Electron（DSH/WorkBuddy类） | 启动时最小化到托盘/隐藏，靠读目录收发 | ⚠️ 通用兜底 |
 | ③ CLI / stdio 模式 | 纯命令行 agent | `spawn` 子进程，双向管道通信 | ✅ 干净 |
 
 ### 7.2 通用接口
@@ -438,7 +438,7 @@ resp  { type:'server-response', rpcId, result:{ ok:true, value } | { ok:false, e
    回群聊 + 产物按"来源分色标签"进右栏群空间
 ```
 
-### 8.3 利好：北辰自身半验证此路
+### 8.3 利好：WorkBuddy自身半验证此路
 WorkBuddy 的 `workbuddy.db` 有 `automation_delivery_outbox`（默认渠道=wechatmp）——官方认可"结果外送到外部渠道"（出向已通）。缺的只是"入站"：用**文件桥**补上最稳。
 
 ### 8.4 文件桥契约（M3 已实现，2026-08-31）
@@ -452,7 +452,7 @@ achat 侧 `BridgeAdapter`（server/adapters.mjs）实现 §6.2 统一接口；�
   "agentId": "beichen-bridge",
   "instruction": "<用户最新一句话 / 本轮回答内容>",
   "role": "<agent.system 人设>",
-  "roster": ["北辰（桥接）（你）", "DSH"],
+  "roster": ["WorkBuddy（桥接）（你）", "DSH"],
   "peers": ["DSH: 它上一轮说的"],
   "answerTo": null | { "question": "<被回答的问题>" },
   "createdAt": 1690000000000
@@ -470,18 +470,18 @@ achat 侧 `BridgeAdapter`（server/adapters.mjs）实现 §6.2 统一接口；�
 
 **轮询与生命周期**：achat 写 inbox 即开始轮询（默认 1s 间隔，可配 `pollMs`），最长 `maxWaitMs`（默认 180s）后判超时并返回"外部产品未回写结果"。读到 result 即解析回群；无论正常/超时/中断（`signal` abort 或 `/abort` 写 cancel 标记），`try/finally` 都会清理 inbox+outbox 三件套，无残留。坏 JSON 容错为 `[bridge] result file corrupted`。
 
-**外部产品职责（北辰真身 / WorkBuddy sidecar / 豆包桌面版）**：轮询 `inbox/` → 读最新 task → 带着 `role/roster/peers` 先读再做 → 写 `outbox/<taskId>.result.json` + 产物落盘。这一步由桥接器外部自己解决，**achat 内核零改动**。M3 已用 `scripts/test-bridge.mjs`（14 例零成本回归：结论+产物 / 询问卡形状 / 中断清理 / 超时 / 坏文件容错 / 上下文搬运）+ `scripts/test-bridge-dispatch.mjs`（5 例端到端：bus.dispatch→BridgeAdapter→回群，含产物挂载）验证 achat 侧全链路。
+**外部产品职责（WorkBuddy真身 / WorkBuddy sidecar / 豆包桌面版）**：轮询 `inbox/` → 读最新 task → 带着 `role/roster/peers` 先读再做 → 写 `outbox/<taskId>.result.json` + 产物落盘。这一步由桥接器外部自己解决，**achat 内核零改动**。M3 已用 `scripts/test-bridge.mjs`（14 例零成本回归：结论+产物 / 询问卡形状 / 中断清理 / 超时 / 坏文件容错 / 上下文搬运）+ `scripts/test-bridge-dispatch.mjs`（5 例端到端：bus.dispatch→BridgeAdapter→回群，含产物挂载）验证 achat 侧全链路。
 
-**桥接器参考实现 `scripts/bridge-runner.mjs`（运行侧，北辰真身 sidecar）**：achat 内核只管「写 inbox、轮询 outbox」，真正的「读 inbox→干→写 outbox」由这个 runner 担任「外部产品」角色。它：
-- `--mode echo`：零成本演示，直接 `[桥接回显] <instruction>` 回写，用于验证整链路。已实测：建群→发「你好北辰桥接」→回显 `[桥接回显] 你好北辰桥接`→inbox/outbox 自动清理，无残留。
+**桥接器参考实现 `scripts/bridge-runner.mjs`（运行侧，WorkBuddy真身 sidecar）**：achat 内核只管「写 inbox、轮询 outbox」，真正的「读 inbox→干→写 outbox」由这个 runner 担任「外部产品」角色。它：
+- `--mode echo`：零成本演示，直接 `[桥接回显] <instruction>` 回写，用于验证整链路。已实测：建群→发「你好WorkBuddy桥接」→回显 `[桥接回显] 你好WorkBuddy桥接`→inbox/outbox 自动清理，无残留。
 - `--mode llm`：调用 DeepSeek（env `DEEPSEEK_API_KEY`）真答，把 `instruction`+`role` 拼 prompt 走 chat/completions，结论写回 `outbox/<taskId>.result.json`。
 - `--poll 200` 控轮询间隔；自带锁（`.running`）防重复实例；读到 task 即处理、回写后清理 inbox，与 achat 侧 `try/finally` 双重清理保证无残留。
 
-**到此 M3 文件桥整链路已真实验证打通**：群里「北辰（桥接）」收消息 → 写 `bridge/beichen-bridge/inbox/` → runner 接住回写 `outbox/` → 结论+产物回群。下一步要让北辰真身真正干活，只需把 `bridge-runner.mjs --mode llm` 接到北辰真身 API，或写一个等价 sidecar（读 inbox、带上下文调北辰、写 outbox+产物）。
+**到此 M3 文件桥整链路已真实验证打通**：群里「WorkBuddy（桥接）」收消息 → 写 `bridge/beichen-bridge/inbox/` → runner 接住回写 `outbox/` → 结论+产物回群。下一步要让WorkBuddy真身真正干活，只需把 `bridge-runner.mjs --mode llm` 接到WorkBuddy真身 API，或写一个等价 sidecar（读 inbox、带上下文调WorkBuddy、写 outbox+产物）。
 
 ### 8.5 启动器 + 哑监控（launcher / monitor，2026-08-31 落地）
 
-**核心认知修正**：桥接层（achat 侧）绝不放 LLM。大脑归 agent，传输层只做搬运。早期曾把 LLM 塞进传输层（`bridge-agent.mjs` 每来一条消息跑一轮 function-calling），三重错：① 每条消息烧 token，N 个 agent 重复烧钱；② 与 agent 自身大脑冗余；③ 那是"模拟北辰"不是真北辰。产品负责人一句话点醒：achat 一拉 agent 为群成员，就该有个开关静默拉起本地 agent 服务 + 同时跑一个**只轮询 inbox 的哑脚本**，大脑由真 agent 自己出。
+**核心认知修正**：桥接层（achat 侧）绝不放 LLM。大脑归 agent，传输层只做搬运。早期曾把 LLM 塞进传输层（`bridge-agent.mjs` 每来一条消息跑一轮 function-calling），三重错：① 每条消息烧 token，N 个 agent 重复烧钱；② 与 agent 自身大脑冗余；③ 那是"模拟WorkBuddy"不是真WorkBuddy。产品负责人一句话点醒：achat 一拉 agent 为群成员，就该有个开关静默拉起本地 agent 服务 + 同时跑一个**只轮询 inbox 的哑脚本**，大脑由真 agent 自己出。
 
 **架构（已实现并真实验证）**：
 - agent 注册加 `config.launcher`：`{ enabled, transport:'file-pipe', service?, headless, monitor:'scripts/bridge-monitor.mjs', agentEntry:'scripts/demo-agent.mjs' }`。
@@ -498,7 +498,7 @@ achat 侧 `BridgeAdapter`（server/adapters.mjs）实现 §6.2 统一接口；�
 
 **监控进程崩溃自恢复（2026-08-31 补验）**：`server.mjs` 的 `spawnMonitor` 在 monitor 异常退出（非主动 stop）时，2 秒后自动重生，兑现"后台静默稳定"承诺。`/stop` 会先置 `rec.stopping=true` 再杀，避免主动停止被误判为崩溃而重启。验证：launch → 强杀 monitor（pid 17296）→ pid 自动变为 16492 且存活、`launched` 仍 true、群里再来一条任务仍正常回包。
 
-**真·北辰 UI 桥接骨架（集成缝，已被 §8.6 推翻，保留作降级参考）**：`scripts/workbuddy-bridge.mjs` 即"真北辰"的大脑入口（`transport:'ui-auto'`）。初判 WorkBuddy 无可调用 API、`desktop-computer-use` 需 `--confirm`，故真身全自动卡在"暴露入口"。**该判断于 2026-09-01 被 §8.6 的 ACP 发现推翻**——WorkBuddy 桌面版自带本地 ACP 服务，真身可直接驱动，无需 UI 自动化。骨架保留：万一某闭源产品确实只有 GUI 无 API 时，仍是降级备选。回归测试 `scripts/test-launch-loop.mjs`（零 LLM token）覆盖：精准投递→哑监控接单→真实回包+产物落群空间→monitor 存活，结果 ALL PASS。
+**真·WorkBuddy UI 桥接骨架（集成缝，已被 §8.6 推翻，保留作降级参考）**：`scripts/workbuddy-bridge.mjs` 即"真WorkBuddy"的大脑入口（`transport:'ui-auto'`）。初判 WorkBuddy 无可调用 API、`desktop-computer-use` 需 `--confirm`，故真身全自动卡在"暴露入口"。**该判断于 2026-09-01 被 §8.6 的 ACP 发现推翻**——WorkBuddy 桌面版自带本地 ACP 服务，真身可直接驱动，无需 UI 自动化。骨架保留：万一某闭源产品确实只有 GUI 无 API 时，仍是降级备选。回归测试 `scripts/test-launch-loop.mjs`（零 LLM token）覆盖：精准投递→哑监控接单→真实回包+产物落群空间→monitor 存活，结果 ALL PASS。
 
 ---
 
@@ -526,10 +526,10 @@ POST /api/v1/acp  (JSON-RPC 2.0) + 头 acp-connection-id / acp-session-token
 
 **端口是动态的**：每次 WorkBuddy 启动分配不同端口（实测序列 53126 → 50409 → 51322/55839 → 53103/55839），且**非始终常驻**（重启后可能未拉起）。适配器必须**自动发现**：① 对每个本地 LISTENING 端口 GET `/` 匹配标题 "Remote Control"/"codebuddy"（主）；② 可能同时存在多实例（实测两个端口都在），任选其一验证 connect 成功即可。`scripts/find-rc-port.mjs` 实现了该发现。
 
-**验证铁证**（2026-09-01，`scripts/acp-probe.mjs` 自动发现端口后端到端）：connect(200) → initialize(200, 返回 agentCapabilities/loadSession/mcpCapabilities) → session/new(200, sessionId) → session/prompt → 82 事件，`agent_message_chunk` 聚合出 **"PONG"**，`outcome: SUCCESS / stopReason: end_turn`。真·北辰真身被程序完整驱动一轮。
+**验证铁证**（2026-09-01，`scripts/acp-probe.mjs` 自动发现端口后端到端）：connect(200) → initialize(200, 返回 agentCapabilities/loadSession/mcpCapabilities) → session/new(200, sessionId) → session/prompt → 82 事件，`agent_message_chunk` 聚合出 **"PONG"**，`outcome: SUCCESS / stopReason: end_turn`。真·WorkBuddy真身被程序完整驱动一轮。
 
 **对 achat 的意义**：
-- **WorkBuddy 类 CLI 型闭源 agent 升级为一等公民**：C 类 Bridge 新增 ACP 形态 adapter（`server/adapters.mjs` 的 `WbAcpAdapter` 已落地，复刻 acp-probe 验证路径；`scripts/test-wb-acp.mjs` 可对真身/mock 测试）。achat 的 launcher/monitor 管道零改动，`agentEntry` 换成 ACP 桥接脚本即可让真北辰被动接群消息、真干活、回群+落空间。
+- **WorkBuddy 类 CLI 型闭源 agent 升级为一等公民**：C 类 Bridge 新增 ACP 形态 adapter（`server/adapters.mjs` 的 `WbAcpAdapter` 已落地，复刻 acp-probe 验证路径；`scripts/test-wb-acp.mjs` 可对真身/mock 测试）。achat 的 launcher/monitor 管道零改动，`agentEntry` 换成 ACP 桥接脚本即可让真WorkBuddy被动接群消息、真干活、回群+落空间。
 - 产品定位修正：**"纯 GUI、无 CLI、无 RC 服务"的闭源产品**才是真正的降级项（UI 自动化/等官方）；凡带 CLI 或 ACP 的闭源 agent（CodeBuddy、可能的 Claude Code/Codex 类）可全自动。
 
 **边界与坑（诚实记录）**：
@@ -540,13 +540,13 @@ POST /api/v1/acp  (JSON-RPC 2.0) + 头 acp-connection-id / acp-session-token
 
 #### 8.6.1 DSH 第三方实测与能力边界（2026-09-02 收敛）
 
-**谁测的**：DSH（A 类适配器，第三方开源 agent）主动安排了一批探测脚本（`scripts/` 下 `capability-probe` / `session-visibility-probe` / `approve-loop*` / `duplex-perm-test` / `init-discover` / `probe-methods` / `asar-*` 等），经 achat 的 WbAcpAdapter 驱动真北辰。这是**跨 agent 验证**（驱动方 DSH ≠ 被驱动方 WorkBuddy），规避了"自指测试验不出驻群能力"的问题。
+**谁测的**：DSH（A 类适配器，第三方开源 agent）主动安排了一批探测脚本（`scripts/` 下 `capability-probe` / `session-visibility-probe` / `approve-loop*` / `duplex-perm-test` / `init-discover` / `probe-methods` / `asar-*` 等），经 achat 的 WbAcpAdapter 驱动真WorkBuddy。这是**跨 agent 验证**（驱动方 DSH ≠ 被驱动方 WorkBuddy），规避了"自指测试验不出驻群能力"的问题。
 
 **群实测铁证**（`mtiqbo3ovu8sts [workbuddy+user]`，2026-09-01 21:55–21:56）：
 
 | 指令 | 结果 |
 |---|---|
-| 请只回复「桥接成功」 | ✅ 真北辰回「桥接成功」 |
+| 请只回复「桥接成功」 | ✅ 真WorkBuddy回「桥接成功」 |
 | 读 `package.json` 的 name 字段 | ✅ **真实读到**并回「zjl-achat（v0.0.1…）」——非编造，真读文件 |
 | 读 `.env` | ⛔ 被 achat 护栏拦截（敏感凭据文件） |
 | 运行 `wmic cpu get name` | ⛔ 被 achat 护栏拦截（系统级命令） |
@@ -560,7 +560,7 @@ POST /api/v1/acp  (JSON-RPC 2.0) + 头 acp-connection-id / acp-session-token
 **关键认知（回应"看不到新会话"）**：ACP 打开的是 **headless 后台会话**，WorkBuddy 不在 UI 渲染可见标签页——"驱动成功但 UI 无新会话"是**隐形**，非"无会话"。群记录里的真实回文（读 package.json 成功）即会话存在的铁证。
 
 **能力边界结论**：
-- ✅ 真北辰进群能**真实读写文件、真实回群**（执行面为真身，保真度 L1.5 文本级）
+- ✅ 真WorkBuddy进群能**真实读写文件、真实回群**（执行面为真身，保真度 L1.5 文本级）
 - ⛔ 高危操作被 achat 护栏兜底，不会因免审批而裸奔
 - ⚠️ 模型调用消耗 **WorkBuddy 账号额度**（429 限流），RC 服务非常驻、端口动态
 - `asar-*` 系列探查结论见 **§8.6.3**（已收敛：无需解包 asar，公开 ACP 表面已够用）
@@ -784,7 +784,7 @@ openDM(agentId)              // 私信会话
 ## 附：与 Mnemo 的关系
 
 - Mnemo 已**搁置**，非删除，代码可作参考（尤其写入归属 / 可见性门控函数）。
-- zjl-Achat 是产品本体；记忆能力若未来需要，可作为某个 agent（如北辰扮演）的能力，而非独立基础设施。
+- zjl-Achat 是产品本体；记忆能力若未来需要，可作为某个 agent（如WorkBuddy扮演）的能力，而非独立基础设施。
 
 ---
 
@@ -881,7 +881,7 @@ after 列目录: {"read":1,"glob":1,"pwsh":1}
 | 用例 | 结果 | 证据 |
 |---|---|---|
 | 状态流 SSE（`/api/agent-status`） | ✅ snapshot + busy/idle 增量推送，带 preview 与 convId | `snapshot beichen=idle dsh=idle invest=idle` |
-| B 类并发（北辰 + 投资研究） | ✅ 685ms / 741ms 完成，状态 busy→idle 正确 | 两条消息各自落盘 |
+| B 类并发（WorkBuddy + 投资研究） | ✅ 685ms / 741ms 完成，状态 busy→idle 正确 | 两条消息各自落盘 |
 | 工具事件流 | ✅ step → tool_call → tool_result 顺序到达 | `step 1` `CALL read :: …/package.json` `done <path>…` `step 2` |
 | A 类**真**中断（DSH） | ✅ abort 后 DSH 侧 running 立刻转 false | 见下方时间线 |
 | 非执行中 abort | ✅ `ok:false` + 原因，不报错 | 任务 2.6s 跑完后再 abort 得到 `{"ok":false,"note":"该 agent 当前不在执行"}` |
@@ -951,9 +951,9 @@ session.stats  status  ping  health  info  version  config.get
 
 **问题（实测确认）**：三人群里，DSH 看不到另外两个 agent 说过什么。
 
-让北辰说一句「斑马代号ZEBRA-7749」，再问 DSH 那串字符是什么，它答：
+让WorkBuddy说一句「斑马代号ZEBRA-7749」，再问 DSH 那串字符是什么，它答：
 
-> 我看不到。我没有访问任何群聊记录……会话中并没有出现来自任何名为「北辰」的成员的消息
+> 我看不到。我没有访问任何群聊记录……会话中并没有出现来自任何名为「WorkBuddy」的成员的消息
 
 **根因两处**：
 
@@ -978,8 +978,8 @@ session.stats  status  ping  health  info  version  config.get
 第一版是「给群友发言加 `[名字]` 前缀，但保持 `role:'assistant'`」。结果模型把那些话当成**自己说过的话**，开始逐字复述上一条群友回复：
 
 ```
-北辰:    [DSH] 本群有投资研究、北辰和我（DSH）三位成员。
-投资研究: [北辰] 本群有投资研究、北辰和我（DSH）三位成员。   ← 原封不动抄北辰的
+WorkBuddy:    [DSH] 本群有投资研究、WorkBuddy和我（DSH）三位成员。
+投资研究: [WorkBuddy] 本群有投资研究、WorkBuddy和我（DSH）三位成员。   ← 原封不动抄WorkBuddy的
 ```
 
 根因：`assistant` 通道在模型眼里等于"我的输出历史"，放什么进去它都认领。**必须降权到 `user` 角色的背景块**，并在 system 里说清那不是它说的：
@@ -991,7 +991,7 @@ session.stats  status  ping  health  info  version  config.get
 
 **⚠️ 第二个坑：名单里不标"你"，agent 会把自己数两遍**
 
-roster 一开始是纯名单，投资研究答：`群里有北辰、DSH和投资研究，加上我共四位。` —— 三人群数出四个人。加 `（你）` 标注后：`北辰和DSH。`
+roster 一开始是纯名单，投资研究答：`群里有WorkBuddy、DSH和投资研究，加上我共四位。` —— 三人群数出四个人。加 `（你）` 标注后：`WorkBuddy和DSH。`
 
 ```js
 // bus.mjs - mark the target's own seat
@@ -1004,8 +1004,8 @@ const rosterFor = (agentId) =>
 **修复后同一测试**：DSH 准确引用出「斑马代号ZEBRA-7749」；全新群里三个 agent 全部 CLEAN 且人数正确：
 
 ```
-CLEAN   投资研究: 北辰和DSH。
-CLEAN   北辰: DSH和投资研究，就咱仨。
+CLEAN   投资研究: WorkBuddy和DSH。
+CLEAN   WorkBuddy: DSH和投资研究，就咱仨。
 CLEAN   DSH: 群里有你、我，还有投资研究。
 VERDICT: no prefix echo
 ```
@@ -1051,7 +1051,7 @@ async ensureSession(signal) {
 
 ### @ 定向与委派：让成员能互相喊人（2026-08-31）
 
-群上下文通了之后，成员能**看见**彼此，但还不会**找**彼此。此前只有前端下拉选择的 `toAgentId` 定向，agent 在回复里写 `@北辰` 不会触发任何路由。
+群上下文通了之后，成员能**看见**彼此，但还不会**找**彼此。此前只有前端下拉选择的 `toAgentId` 定向，agent 在回复里写 `@WorkBuddy` 不会触发任何路由。
 
 **两件事，成本完全不同，因此策略不同：**
 
@@ -1064,7 +1064,7 @@ async ensureSession(signal) {
 
 ```js
 // Longest name first, and blank out each hit as it is found: otherwise a short
-// name consumes a longer one ("@北辰" would match inside "@北辰辰").
+// name consumes a longer one ("@WorkBuddy" would match inside "@WorkBuddy辰").
 cands.sort((x, y) => y.n.length - x.n.length);
 ...
 rest = rest.slice(0, i) + ' '.repeat(at.length) + rest.slice(i + at.length);
@@ -1082,7 +1082,7 @@ rest = rest.slice(0, i) + ' '.repeat(at.length) + rest.slice(i + at.length);
 **⚠️ 注入文案里「何时不用」那一半才是重点**（抄自 CodexHost 拆解里的教科书细节）：只说"你可以 @别人"，模型会滥用。必须写清负例：
 
 ```
-你可以点名其他成员：回复里写 @他的名字（例如 @北辰），他会在你之后接着回答。
+你可以点名其他成员：回复里写 @他的名字（例如 @WorkBuddy），他会在你之后接着回答。
 但以下情况不要点名——你自己就能回答的、只是顺带提到某人的、闲聊或确认类的。
 每次点名都会多花一轮，只在真的需要他的专业能力时才用，一条回复最多点名一个人。
 ```
@@ -1093,7 +1093,7 @@ rest = rest.slice(0, i) + ' '.repeat(at.length) + rest.slice(i + at.length);
 
 | 用例 | 结果 |
 |---|---|
-| `@北辰 …`（三人群） | ✅ 只有北辰回答（1 条） |
+| `@WorkBuddy …`（三人群） | ✅ 只有WorkBuddy回答（1 条） |
 | 无 @ | ✅ 三个都回答 |
 | 委派关闭时 agent 回复含 `@DSH` | ✅ DSH 不动 |
 | 委派开启 | ✅ DSH 被接上，消息带 `delegatedBy: beichen` |
@@ -1106,7 +1106,7 @@ rest = rest.slice(0, i) + ' '.repeat(at.length) + rest.slice(i + at.length);
 
 **发现的 bug**：B 类（`ModelAdapter`）的 `ping()` 原本是 `return !!this.key` —— **只检查有没有配 key，从不验证 API 是否真的可达**。
 
-后果：key 被吊销、额度用尽、DeepSeek 挂了、网络断了 —— 北辰和投资研究的灯**始终是绿色**。产品负责人要的四态是「干活 / 离线 / 空闲」，其中**"离线"对 3 个 agent 里的 2 个是假的**（只有 DSH 走本地 RPC，检测为真）。
+后果：key 被吊销、额度用尽、DeepSeek 挂了、网络断了 —— WorkBuddy和投资研究的灯**始终是绿色**。产品负责人要的四态是「干活 / 离线 / 空闲」，其中**"离线"对 3 个 agent 里的 2 个是假的**（只有 DSH 走本地 RPC，检测为真）。
 
 **为什么当初这么写**：注释写的是"No network round-trip: a bare model API is 'up' as long as we hold a key"。动机没错（心跳 20s 一次，不能每次发请求），但**把成本问题和正确性问题混为一谈了**。
 
@@ -1131,7 +1131,7 @@ async ping() {
 
 **实测（双实例对照，零数据改动）**：同一个 `data.json`，主实例 8787 用真 key，测试实例 8788 用垃圾 key（`PORT=8788 DEEPSEEK_API_KEY=sk-this-key-is-garbage`）：
 
-| | 北辰 | DSH | 投资研究 |
+| | WorkBuddy | DSH | 投资研究 |
 |---|---|---|---|
 | 8787 真 key | idle 🟢 | idle 🟢 | idle 🟢 |
 | 8788 垃圾 key | **offline ⚫** | idle 🟢 | **offline ⚫** |

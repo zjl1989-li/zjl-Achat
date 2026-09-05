@@ -106,7 +106,7 @@ function lastUserText(ctx) {
   return '';
 }
 
-// "@北辰 帮我看看" -> ['beichen']. Candidates come from the member list only,
+// "@WorkBuddy 帮我看看" -> ['beichen']. Candidates come from the member list only,
 // so @ in an email, a decorator or prose can never invent a target.
 // Exported for the regression test: a mis-parse silently sends the turn to the
 // wrong member, which is the kind of bug nobody notices until it matters.
@@ -119,7 +119,7 @@ export function parseMentions(text, agents, memberIds) {
     }
   }
   // Longest name first, and blank out each hit as it is found: otherwise a short
-  // name consumes a longer one ("@北辰" would match inside "@北辰辰").
+  // name consumes a longer one ("@WorkBuddy" would match inside "@WorkBuddy辰").
   cands.sort((x, y) => y.n.length - x.n.length);
   let rest = String(text || '').toLowerCase();
   const hits = [];
@@ -181,7 +181,7 @@ export async function dispatch({
 
   const nameOf = (id) => (agents.find((a) => a.id === id) || { name: id }).name;
   // Mark the target's own seat: given a plain name list, agents counted
-  // themselves twice ("北辰、DSH、投资研究，加上我共四位").
+  // themselves twice ("WorkBuddy、DSH、投资研究，加上我共四位").
   const rosterFor = (agentId) => (conv.memberIds || []).map((id) => nameOf(id) + (id === agentId ? '（你）' : ''));
   const prompt = lastUserText(buildContext(conv, '', agents, ctxBudget(settings)));
   // RETRIEVAL PIPE (L2 -> L0): knowledge-base hits relevant to this turn,

@@ -10,8 +10,8 @@
 //                    'C' = Bridge Adapter (file-bridge, closed-source product).
 const DEFAULT_AGENTS = [
   {
-    id: 'beichen', name: '北辰', role: 'AI 量化交易分析师', color: '#f0997b',
-    system: '你是北辰，一个直接、用数据说话的 AI 量化交易分析师。牛市提醒风险，熊市找机会。对用户诚实，没有确定性机会就说没有。说话简洁，中文。',
+    id: 'beichen', name: 'WorkBuddy', role: 'AI 量化交易分析师', color: '#f0997b',
+    system: '你是WorkBuddy，一个直接、用数据说话的 AI 量化交易分析师。牛市提醒风险，熊市找机会。对用户诚实，没有确定性机会就说没有。说话简洁，中文。',
     model: 'deepseek-chat', adapterType: 'B', status: 'online', guiPath: '', skills: [],
     config: { adapterType: 'B', model: 'deepseek-chat', apiKeyEnv: 'DEEPSEEK_API_KEY' },
   },
@@ -32,8 +32,8 @@ const DEFAULT_AGENTS = [
   // M3 file-bridge sample: achat ferries the turn to a local product that reads
   // bridge/beichen-bridge/inbox and writes back outbox. No network, no token.
   {
-    id: 'beichen-bridge', name: '北辰（桥接）', role: 'AI 量化交易分析师（文件桥接真身）', color: '#f0997b',
-    system: '你是北辰，一个直接、用数据说话的 AI 量化交易分析师。牛市提醒风险，熊市找机会。对用户诚实，没有确定性机会就说没有。说话简洁，中文。',
+    id: 'beichen-bridge', name: 'WorkBuddy（桥接）', role: 'AI 量化交易分析师（文件桥接真身）', color: '#f0997b',
+    system: '你是WorkBuddy，一个直接、用数据说话的 AI 量化交易分析师。牛市提醒风险，熊市找机会。对用户诚实，没有确定性机会就说没有。说话简洁，中文。',
     model: '', adapterType: 'C', status: 'online', guiPath: '', skills: [],
     config: {
       adapterType: 'C', localDir: 'bridge/beichen-bridge', pollMs: 1000, maxWaitMs: 180000,

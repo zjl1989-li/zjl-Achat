@@ -173,9 +173,9 @@ test('/api/fetch rejects non-http schemes', async () => {
 });
 
 test('/files serves only image extensions from absolute paths', async () => {
-  const ok = await req('/files?path=' + encodeURIComponent(join(tmp, 'public', 'favicon.svg')));
+  const ok = await req('/files?path=' + encodeURIComponent(join(tmp, 'public', 'logo.png')));
   assert.equal(ok.status, 200);
-  assert.match(ok.headers['content-type'], /svg/);
+  assert.match(ok.headers['content-type'], /png/);
 
   const notImg = await req('/files?path=' + encodeURIComponent(join(tmp, 'server', 'data.json')));
   assert.equal(notImg.status, 400);

@@ -169,7 +169,7 @@ export function detectAskFromModel(text) {
 // The "when NOT to" half is the important half: without it a chatty model turns
 // every reply into a group conference, and each ping is another paid turn.
 export const DELEGATION_RULE =
-  `你可以点名其他成员：回复里写 @他的名字（例如 @北辰），他会在你之后接着回答。` +
+  `你可以点名其他成员：回复里写 @他的名字（例如 @WorkBuddy），他会在你之后接着回答。` +
   `但以下情况不要点名——你自己就能回答的、只是顺带提到某人的、闲聊或确认类的。` +
   `每次点名都会多花一轮，只在真的需要他的专业能力时才用，一条回复最多点名一个人。`;
 

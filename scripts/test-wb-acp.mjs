@@ -29,7 +29,7 @@ const res = await adapter.send({
   agent,
   messages: [{ role: 'user', content: '请只回复「桥接成功」这四个字，不要加任何其他内容。' }],
   peers: [],
-  roster: ['WorkBuddy 真身（你）', '北辰', 'DSH'],
+  roster: ['WorkBuddy 真身（你）', 'WorkBuddy', 'DSH'],
   answerTo: null,
   allowDelegate: false,
   signal: null,

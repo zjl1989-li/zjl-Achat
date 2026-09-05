@@ -1,9 +1,9 @@
-// TRUE-北辰 bridge skeleton (the real WorkBuddy "brain").
+// TRUE-WorkBuddy bridge skeleton (the real WorkBuddy "brain").
 //
 // This is the integration SEAM for wiring the actual WorkBuddy app into achat
 // as a closed-source agent (transport: 'ui-auto' in config.launcher). Today
 // WorkBuddy exposes no callable HTTP/RPC API and desktop-computer-use needs
-// human --confirm, so true-北辰 automation is blocked until an endpoint exists.
+// human --confirm, so true-WorkBuddy automation is blocked until an endpoint exists.
 //
 // Until then this script fails CLEAN: it outputs a valid JSON result (so the
 // monitor never crashes or hangs) explaining exactly what to set. The moment
@@ -44,7 +44,7 @@ if (!bridgeUrl) {
     '真身桥接尚未配置：请在环境变量 WORKBUDDY_BRIDGE_URL 中填入 WorkBuddy 暴露的 API/RPC 端点'
     + '（接受 { instruction } 并返回 { conclusion, artifacts }），或在 config.launcher 中指定。'
     + '当前 achat 的文件桥接传输层已跑通（见 demo-agent.mjs 真实验证），'
-    + '只差 WorkBuddy 暴露一个可被程序调用的入口即可把"真北辰"接进来。',
+    + '只差 WorkBuddy 暴露一个可被程序调用的入口即可把"真WorkBuddy"接进来。',
   );
 }
 
