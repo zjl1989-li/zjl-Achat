@@ -13,6 +13,7 @@ import { describeProbe } from './adapters.mjs';
 import { createKnowledge } from './memory/knowledge.mjs';
 import { createSkills } from './memory/skills.mjs';
 import { createAcl } from './memory/acl.mjs';
+import { distillConv, distillMessage } from './memory/distill.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -23,6 +24,14 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const kb = createKnowledge({ dir: process.env.ACHAT_KB_DIR || join(__dirname, 'kb') });
 const skills = createSkills({ file: join(__dirname, 'skills.json') });
 const acl = createAcl({ file: join(__dirname, 'acl.json') });
+// Retrieval pipe (L2 -> L0): bus asks this before every turn. Kept small and
+// non-fatal — a failed recall must never fail a chat turn.
+const kbRecall = (text) => kb.search(text, { limit: 3 });
+// Distill pipe (L1 -> L2), auto path: consensus conclusions land in the KB.
+const distillConclusion = (conv, msg, agents) => {
+  const d = distillMessage(conv, msg, agents);
+  return kb.write({ ...d, source: 'consensus' });
+};
 
 // --- single-instance lock (zero-dep) ---
 // Tray launcher + a manual `node server/server.mjs` (or two launches with
@@ -927,6 +936,21 @@ async function handleApi(req, res, url) {
   if (method === 'GET' && url.pathname === '/api/acl/audit') {
     return sendJson(res, 200, acl.audit());
   }
+  // Distill pipe (L1 -> L2), manual path: digest a whole group, or pin one
+  // exact message, into the knowledge base. Re-distilling the same group
+  // appends a dated section (沉淀), it never stacks duplicates or deletes.
+  if (method === 'POST' && url.pathname === '/api/memory/distill') {
+    const b = await readBody(req);
+    const c = b.convId && store.getConversation(b.convId);
+    if (!c) return sendJson(res, 404, { error: 'conversation not found' });
+    const agents = store.getAgents();
+    if (b.messageId) {
+      const m = (c.messages || []).find((x) => x.id === b.messageId);
+      if (!m) return sendJson(res, 404, { error: 'message not found' });
+      return sendJson(res, 200, kb.write({ ...distillMessage(c, m, agents), source: 'pinned' }));
+    }
+    return sendJson(res, 200, kb.write({ ...distillConv(c, agents), source: 'distill' }));
+  }
 
   if (method === 'GET' && url.pathname === '/api/agents/discover') {
     return sendJson(res, 200, await discoverLocalAgents());
@@ -1130,6 +1154,7 @@ async function handleApi(req, res, url) {
         emit, persist: () => store.save(),
         recordTool: (agentId, tool) => store.recordTool(agentId, tool),
         settings: store.getSettings(),
+        recall: kbRecall, onConclusion: distillConclusion,
       }).catch((e) => console.error('consensus error', e.message));
       return sendJson(res, 200, { ok: true, note: '协商已启动', topic });
     }
@@ -1146,6 +1171,7 @@ async function handleApi(req, res, url) {
       persist: () => store.save(),
       recordTool: (agentId, tool) => store.recordTool(agentId, tool),
       settings: store.getSettings(),
+      recall: kbRecall,
     }).catch((e) => console.error('bus error', e.message));
     return sendJson(res, 200, msg);
   }
@@ -1162,6 +1188,7 @@ async function handleApi(req, res, url) {
       emit, persist: () => store.save(),
       recordTool: (agentId, tool) => store.recordTool(agentId, tool),
       settings: store.getSettings(),
+      recall: kbRecall, onConclusion: distillConclusion,
     }).catch((e) => console.error('consensus error', e.message));
     return sendJson(res, 200, { ok: true, note: '协商已启动' });
   }

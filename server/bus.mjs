@@ -38,7 +38,15 @@ export function dropAdapter(agentId) {
 // inline ([name] text) and keeping role=assistant: the model read them as its
 // own words and started parroting the last peer reply verbatim. So collapse
 // consecutive peer turns into user-role background blocks instead.
-function buildContext(conv, agentId, agents) {
+//
+// L0 WORKING-MEMORY BUDGET: the newest turns are kept, the oldest are dropped
+// once the char budget is exceeded (chars are a good-enough token proxy for a
+// mixed CJK/Latin transcript; a real tokenizer would be a dependency). The
+// last message — the turn being answered — is always kept. Distilled history
+// lives in the knowledge base (L2) and comes back in via the recall pipe.
+const CTX_BUDGET_DEFAULT = 12000;
+
+export function buildContext(conv, agentId, agents, budget = CTX_BUDGET_DEFAULT) {
   const nameOf = (id) => (agents.find((a) => a.id === id) || { name: id }).name;
   const out = [];
   const buf = [];
@@ -61,7 +69,18 @@ function buildContext(conv, agentId, agents) {
     else if (m.sender === 'agent') { flush(); out.push({ role: 'assistant', content: text }); }
   }
   flush();
+  let total = out.reduce((n, m) => n + (m.content || '').length, 0);
+  while (out.length > 1 && total > budget) {
+    total -= (out[0].content || '').length;
+    out.shift();
+  }
   return out;
+}
+
+// Settings may override the budget per deployment (settings.ctxBudgetChars).
+function ctxBudget(settings) {
+  const n = Number(settings && settings.ctxBudgetChars);
+  return Number.isFinite(n) && n > 0 ? n : CTX_BUDGET_DEFAULT;
 }
 
 // What the target physically cannot already see. A DSH session only ever held
@@ -155,7 +174,7 @@ export async function probeAgent(agent) {
  */
 export async function dispatch({
   conv, agents, toAgentId, emit, persist, recordTool,
-  depth = 0, delegatedBy = '', settings,
+  depth = 0, delegatedBy = '', settings, recall,
 }) {
   const targets = resolveTargets({ conv, agents, toAgentId });
   if (!targets.length) return;
@@ -164,7 +183,15 @@ export async function dispatch({
   // Mark the target's own seat: given a plain name list, agents counted
   // themselves twice ("北辰、DSH、投资研究，加上我共四位").
   const rosterFor = (agentId) => (conv.memberIds || []).map((id) => nameOf(id) + (id === agentId ? '（你）' : ''));
-  const prompt = lastUserText(buildContext(conv, '', agents));
+  const prompt = lastUserText(buildContext(conv, '', agents, ctxBudget(settings)));
+  // RETRIEVAL PIPE (L2 -> L0): knowledge-base hits relevant to this turn,
+  // fetched BEFORE dispatch and handed to every adapter as `recall`. Adapters
+  // that fold blocks (DSH) or prepend context (model API) use it; the rest
+  // ignore it. Failure to recall must never fail the turn.
+  let recalled = [];
+  if (typeof recall === 'function' && prompt) {
+    try { recalled = (await recall(prompt) || []).slice(0, 3); } catch { recalled = []; }
+  }
   const produced = [];
   // agentId -> the question this reply answers, if any. Read before dispatch so
   // a concurrent answer cannot move the target list halfway through the turn.
@@ -196,9 +223,12 @@ export async function dispatch({
       const { text, nativeSessionId, contextLost, ask: newAsk, artifacts } = await adapter.send({
         agent,
         convId: conv.id,
-        messages: buildContext(conv, agent.id, agents),
+        messages: buildContext(conv, agent.id, agents, ctxBudget(settings)),
         peers: peerLines(conv, agent.id, agents),
         roster: rosterFor(agent.id),
+        // Knowledge-base hits for this turn (L2 -> L0 pipe). Empty = nothing
+        // matched, adapters just skip the block.
+        ...(recalled.length ? { recall: recalled } : {}),
         // The question this turn answers, if the user was replying to one. The
         // adapter folds it back in, because from the agent's side this is a
         // brand new turn that has no idea it ever asked.
@@ -288,7 +318,7 @@ const MAX_ROUNDS = 6;
 
 export async function runConsensus({
   conv, agents, topic, participantIds, rounds, synthesizerId,
-  emit, persist, recordTool, settings,
+  emit, persist, recordTool, settings, recall, onConclusion,
 }) {
   if (conv.negotiation && conv.negotiation.active) {
     throw new Error('该群已有协商进行中');
@@ -338,7 +368,7 @@ export async function runConsensus({
       try {
         await dispatch({
           conv, agents, toAgentId: a.id, emit, persist, recordTool,
-          settings: { ...settings, delegation: false },
+          settings: { ...settings, delegation: false }, recall,
         });
       } catch (e) {
         negotiation.errors.push({ round: r, agent: a.id, error: String((e && e.message) || e) });
@@ -354,7 +384,7 @@ export async function runConsensus({
   try {
     await dispatch({
       conv, agents, toAgentId: synth.id, emit, persist, recordTool,
-      settings: { ...settings, delegation: false },
+      settings: { ...settings, delegation: false }, recall,
     });
   } catch (e) {
     negotiation.errors.push({ round: 'conclusion', agent: synth.id, error: String((e && e.message) || e) });
@@ -366,6 +396,14 @@ export async function runConsensus({
     last.meta = { ...(last.meta || {}), consensusConclusion: true };
     persist();
     emit('message', { convId: conv.id, message: last, update: true });
+  }
+  // DISTILL PIPE (L1 -> L2), auto path: a consensus conclusion is already
+  // distilled content — hand it to the caller's sink so it lands in the
+  // knowledge base without anyone remembering to do it. Never fatal.
+  if (last && typeof onConclusion === 'function') {
+    try { onConclusion(conv, last, agents); } catch (e) {
+      console.error('[consensus] conclusion distill failed:', e && e.message);
+    }
   }
 
   negotiation.phase = 'concluded';

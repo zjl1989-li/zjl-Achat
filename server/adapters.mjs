@@ -91,7 +91,7 @@ export class ModelAdapter {
     }
   }
 
-  async send({ messages, onDelta, signal, roster, allowDelegate, answerTo }) {
+  async send({ messages, onDelta, signal, roster, allowDelegate, answerTo, recall }) {
     if (!this.key) return { text: `[${this.agent.name}] 未配置 API Key，无法调用模型。` };
 
     // An answer must carry the question it answers: a bare "watermelon" in the
@@ -103,9 +103,15 @@ export class ModelAdapter {
         ? { ...m, content: `${m.content}\n\n[你刚才问用户的问题]\n${answerTo.question}\n[用户的回答]\n${lastUserText([m])}\n请基于这个回答继续执行原来的任务。` }
         : m)
       : messages;
+    // Retrieval pipe (L2 -> L0): knowledge-base hits, injected as reference
+    // material before the transcript so old-but-relevant knowledge survives
+    // the L0 budget trim of the message history.
+    const recallMsgs = (recall && recall.length)
+      ? [{ role: 'system', content: `[群知识库相关记忆（背景资料，可选参考）]\n${recall.map((r) => `- ${r.title}${r.snippet ? '：' + r.snippet : ''}`).join('\n')}` }]
+      : [];
     const body = {
       model: this.model,
-      messages: [{ role: 'system', content: systemText(this.agent.system, roster, allowDelegate) }, ...msgs],
+      messages: [{ role: 'system', content: systemText(this.agent.system, roster, allowDelegate) }, ...recallMsgs, ...msgs],
       stream: !!onDelta,
       temperature: 0.7,
     };
@@ -320,17 +326,17 @@ export class DshAdapter {
     this.rpc('session.cancel', { sessionId: sid }).catch(() => {});
   }
 
-  async send({ convId, messages, signal, onEvent, peers, roster, allowDelegate, answerTo }) {
+  async send({ convId, messages, signal, onEvent, peers, roster, allowDelegate, answerTo, recall }) {
     const st = await this.ensureSession(signal, convId);
     this.activeSessionId = st.sessionId;
     try {
-      return await this._turn({ st, messages, signal, onEvent, peers, roster, allowDelegate, answerTo });
+      return await this._turn({ st, messages, signal, onEvent, peers, roster, allowDelegate, answerTo, recall });
     } finally {
       this.activeSessionId = null;
     }
   }
 
-  async _turn({ st, messages, signal, onEvent, peers, roster, allowDelegate, answerTo }) {
+  async _turn({ st, messages, signal, onEvent, peers, roster, allowDelegate, answerTo, recall }) {
     const sessionId = st.sessionId;
     const contextLost = st.contextLost;
     st.contextLost = false;      // report the loss once, on the turn that hits it
@@ -345,6 +351,11 @@ export class DshAdapter {
     if (roster && roster.length) blocks.push(`[群成员]\n${roster.join('、')}`);
     if (allowDelegate) blocks.push(`[点名规则]\n${DELEGATION_RULE}`);
     if (peers && peers.length) blocks.push(`[群内其他成员的发言]\n${peers.join('\n')}`);
+    // Retrieval pipe (L2 -> L0): knowledge-base hits for this turn. Framed as
+    // reference material — the agent may use it, it is not an instruction.
+    if (recall && recall.length) {
+      blocks.push(`[群知识库相关记忆（背景资料，可选参考）]\n${recall.map((r) => `- ${r.title}${r.snippet ? '：' + r.snippet : ''}`).join('\n')}`);
+    }
     // An answer has to carry the question with it: this is a brand new turn from
     // DSH's point of view, and without the question the answer looks like a
     // non-sequitur ("watermelon" to an agent that has forgotten it asked).
@@ -527,7 +538,7 @@ export class BridgeAdapter {
 
   // The payload the external product consumes. achat owns context assembly
   // (role/roster/peers/answerTo); the bridge ferries it verbatim.
-  buildTask({ messages, peers, roster, answerTo, convId }) {
+  buildTask({ messages, peers, roster, answerTo, convId, recall }) {
     return {
       schema: 'zjl-achat-bridge/1',
       agentId: this.agent.id,
@@ -537,15 +548,16 @@ export class BridgeAdapter {
       peers: peers || [],
       answerTo: answerTo || null, // { question } when this turn answers a prior ask
       convId: convId || null, // group the task came from, so the external product can file artifacts back
+      recall: recall || [],   // knowledge-base hits (L2 -> L0 pipe), may be ignored by the product
       createdAt: Date.now(),
     };
   }
 
-  async send({ messages, peers, roster, answerTo, signal, onEvent, convId }) {
+  async send({ messages, peers, roster, answerTo, signal, onEvent, convId, recall }) {
     await this.ping(); // ensure inbox/outbox exist
     const taskId = 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     this.curTaskId = taskId;
-    writeFileSync(this.taskPath(taskId), JSON.stringify(this.buildTask({ messages, peers, roster, answerTo, convId }), null, 2));
+    writeFileSync(this.taskPath(taskId), JSON.stringify(this.buildTask({ messages, peers, roster, answerTo, convId, recall }), null, 2));
     if (onEvent) onEvent({ kind: 'step', step: 'bridge: waiting for external product result' });
 
     const started = Date.now();
@@ -827,7 +839,7 @@ export class WbAcpAdapter {
 
   // guardrail() is defined at module scope and shared with WbCliKeyAdapter.
 
-  async send({ messages, peers, roster, answerTo, signal, onEvent, allowDelegate }) {
+  async send({ messages, peers, roster, answerTo, signal, onEvent, allowDelegate, recall }) {
     // 1) locate the service (cached port skips the scan)
     if (!this.port || !(await this._tcpAlive(this.port))) {
       const p = await this.discoverPort();
@@ -871,6 +883,11 @@ export class WbAcpAdapter {
     if (roster && roster.length) blocks.push(`[群成员]\n${roster.join('、')}`);
     if (allowDelegate) blocks.push(`[点名规则]\n${DELEGATION_RULE}`);
     if (peers && peers.length) blocks.push(`[群内其他成员的发言]\n${peers.join('\n')}`);
+    // Retrieval pipe (L2 -> L0): knowledge-base hits for this turn. Framed as
+    // reference material — the agent may use it, it is not an instruction.
+    if (recall && recall.length) {
+      blocks.push(`[群知识库相关记忆（背景资料，可选参考）]\n${recall.map((r) => `- ${r.title}${r.snippet ? '：' + r.snippet : ''}`).join('\n')}`);
+    }
     if (answerTo) {
       blocks.push(`[你刚才问用户的问题]\n${answerTo.question}`);
       blocks.push(`[用户的回答]\n${lastUserText(messages)}`);
@@ -1043,7 +1060,7 @@ export class WbCliKeyAdapter {
     if (this._activeChild) { try { this._activeChild.kill('SIGTERM'); } catch {} this._activeChild = null; }
   }
 
-  async send({ messages, peers, roster, answerTo, signal, onEvent, allowDelegate }) {
+  async send({ messages, peers, roster, answerTo, signal, onEvent, allowDelegate, recall }) {
     if (!this.apiKey) return { text: `[${this.agent.name}] 未配置 CODEBUDDY_API_KEY（cli-key 通路需要 API Key）` };
     if (!existsSync(this.cliPath)) return { text: `[${this.agent.name}] 找不到 CodeBuddy CLI：${this.cliPath}` };
 
@@ -1060,6 +1077,11 @@ export class WbCliKeyAdapter {
     if (roster && roster.length) blocks.push(`[群成员]\n${roster.join('、')}`);
     if (allowDelegate) blocks.push(`[点名规则]\n${DELEGATION_RULE}`);
     if (peers && peers.length) blocks.push(`[群内其他成员的发言]\n${peers.join('\n')}`);
+    // Retrieval pipe (L2 -> L0): knowledge-base hits for this turn. Framed as
+    // reference material — the agent may use it, it is not an instruction.
+    if (recall && recall.length) {
+      blocks.push(`[群知识库相关记忆（背景资料，可选参考）]\n${recall.map((r) => `- ${r.title}${r.snippet ? '：' + r.snippet : ''}`).join('\n')}`);
+    }
     if (answerTo) {
       blocks.push(`[你刚才问用户的问题]\n${answerTo.question}`);
       blocks.push(`[用户的回答]\n${userText}`);
@@ -1558,7 +1580,7 @@ export class CliAdapter {
     if (this._child) { try { this._child.kill('SIGTERM'); } catch {} this._child = null; }
   }
 
-  async send({ messages, peers, roster, answerTo, signal, onEvent }) {
+  async send({ messages, peers, roster, answerTo, signal, onEvent, recall }) {
     if (!this.cliCmd) return { text: `[${this.agent.name}] 未配置 CLI 命令（cliCmd）` };
     const userText = lastUserText(messages) || '';
     const g = guardrail(userText);
@@ -1570,6 +1592,10 @@ export class CliAdapter {
     if (this.agent.system) blocks.push(`[你的角色]\n${this.agent.system}`);
     if (roster && roster.length) blocks.push(`[群成员]\n${roster.join('、')}`);
     if (peers && peers.length) blocks.push(`[群内其他成员的发言]\n${peers.join('\n')}`);
+    // Retrieval pipe (L2 -> L0): knowledge-base hits for this turn.
+    if (recall && recall.length) {
+      blocks.push(`[群知识库相关记忆（背景资料，可选参考）]\n${recall.map((r) => `- ${r.title}${r.snippet ? '：' + r.snippet : ''}`).join('\n')}`);
+    }
     if (answerTo) {
       blocks.push(`[你刚才问用户的问题]\n${answerTo.question}`);
       blocks.push(`[用户的回答]\n${userText}`);
