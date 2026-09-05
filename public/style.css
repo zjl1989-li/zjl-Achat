@@ -49,13 +49,13 @@ button, input, select, textarea { font-family: inherit; }
 .resizer { flex: 0 0 4px; align-self: stretch; cursor: col-resize; background: transparent; position: relative; z-index: 8; transition: background .12s; }
 .resizer::after { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; transform: translateX(-50%); width: 1px; background: var(--border); transition: background .12s; }
 .resizer:hover::after, .resizer.active::after { background: var(--accent); }
-/* fold buttons now live in the center header (far left / far right corner),
-   styled like the other head-actions icon buttons; chevron flips when folded. */
-#chatHead .fold-btn { flex: 0 0 auto; background: var(--panel2); color: var(--text); border: 1px solid var(--border); border-radius: var(--r-md); width: 30px; height: 30px; padding: 0; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
-#chatHead .fold-btn:hover { border-color: var(--accent); color: var(--accent); }
-#chatHead .fold-btn svg { flex: 0 0 auto; transition: transform .18s; }
-body.left-fold #foldLeft svg { transform: rotate(180deg); }
-body.right-fold #foldRight svg { transform: rotate(180deg); }
+/* fold buttons live in the center header (far left / far right corner),
+   styled like flat icon buttons: no border/background, tint on hover. */
+#chatHead .fold-btn { flex: 0 0 auto; background: transparent; color: var(--muted); border: none; border-radius: var(--r-md); width: 32px; height: 32px; padding: 0; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: color .15s, background .15s; }
+#chatHead .fold-btn:hover { color: var(--text); background: var(--panel2); }
+#chatHead .fold-btn svg { flex: 0 0 auto; }
+/* folded state feedback: tint the icon accent since there is no chevron flip */
+body.left-fold #foldLeft, body.right-fold #foldRight { color: var(--accent); }
 /* folded rails collapse to zero width */
 body.left-fold #left { flex-basis: 0; border-right: none; overflow: hidden; }
 body.right-fold #right { flex-basis: 0; border-left: none; overflow: hidden; }
