@@ -1361,7 +1361,8 @@ const IMG_MAX_BYTES = 25 * 1024 * 1024;
 
 function serveLocalImage(res, url) {
   const p = (url.searchParams.get('path') || '').trim();
-  const abs = /^[A-Za-z]:[\\/]/.test(p) || p.startsWith('//') || p.startsWith('\\\\');
+  // Absolute paths: Windows drive letters, UNC shares, and POSIX '/'-rooted.
+  const abs = /^[A-Za-z]:[\\/]/.test(p) || p.startsWith('//') || p.startsWith('\\\\') || p.startsWith('/');
   if (!abs || !IMG_EXT.has(extname(p).toLowerCase())) {
     res.writeHead(400);
     return res.end('bad path');
