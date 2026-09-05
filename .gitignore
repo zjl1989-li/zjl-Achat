@@ -6,6 +6,9 @@ data.json
 server/space/
 server/avatars/
 server/archive/
+server/kb/
+server/skills.json
+server/acl.json
 bridge/
 
 # logs

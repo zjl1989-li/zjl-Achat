@@ -10,8 +10,19 @@ import { store } from './store.mjs';
 import { dispatch, probeAgent, isRunning, dropAdapter, runConsensus } from './bus.mjs';
 import { getStatus, allStatus, onStatus, setStatus, abort } from './runtime.mjs';
 import { describeProbe } from './adapters.mjs';
+import { createKnowledge } from './memory/knowledge.mjs';
+import { createSkills } from './memory/skills.mjs';
+import { createAcl } from './memory/acl.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// ---- memory layer (三库): knowledge / skills / permissions ----
+// Knowledge vault: a local Obsidian-style .md folder (env override for users
+// who keep their vault elsewhere). Skills + ACL live as tiny JSON files next
+// to data.json, same style. ACL is fail-closed: nothing is allowed by default.
+const kb = createKnowledge({ dir: process.env.ACHAT_KB_DIR || join(__dirname, 'kb') });
+const skills = createSkills({ file: join(__dirname, 'skills.json') });
+const acl = createAcl({ file: join(__dirname, 'acl.json') });
 
 // --- single-instance lock (zero-dep) ---
 // Tray launcher + a manual `node server/server.mjs` (or two launches with
@@ -890,6 +901,32 @@ async function probeAll() {
 async function handleApi(req, res, url) {
   const parts = url.pathname.split('/').filter(Boolean);
   const method = req.method;
+
+  // ---- memory layer (三库) REST ----
+  if (method === 'GET' && url.pathname === '/api/kb/search') {
+    return sendJson(res, 200, kb.search(url.searchParams.get('q') || '', { limit: Number(url.searchParams.get('limit')) || 8 }));
+  }
+  if (method === 'GET' && url.pathname === '/api/kb/recent') {
+    return sendJson(res, 200, kb.recent(Number(url.searchParams.get('n')) || 10));
+  }
+  if (method === 'POST' && url.pathname === '/api/kb/note') {
+    const b = await readBody(req);
+    return sendJson(res, 200, kb.write({ title: b.title, body: b.body, tags: b.tags, source: b.source }));
+  }
+  if (method === 'GET' && url.pathname === '/api/skills') {
+    return sendJson(res, 200, skills.list());
+  }
+  if (method === 'POST' && url.pathname === '/api/acl/grant') {
+    const b = await readBody(req);
+    return sendJson(res, 200, { granted: acl.grant(b) });
+  }
+  if (method === 'GET' && url.pathname === '/api/acl/can') {
+    const q = url.searchParams;
+    return sendJson(res, 200, { allowed: acl.can({ convId: q.get('conv'), agentId: q.get('agent'), cap: q.get('cap') }) });
+  }
+  if (method === 'GET' && url.pathname === '/api/acl/audit') {
+    return sendJson(res, 200, acl.audit());
+  }
 
   if (method === 'GET' && url.pathname === '/api/agents/discover') {
     return sendJson(res, 200, await discoverLocalAgents());

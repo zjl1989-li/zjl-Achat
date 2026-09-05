@@ -5,19 +5,33 @@
 import { createAdapter } from './adapters.mjs';
 import { beginTask, endTask, isRunning, getPendingAsks, setPendingAsk, clearPendingAsk } from './runtime.mjs';
 
-const adapters = new Map(); // agentId -> adapter instance (keeps DSH session alive)
+// Adapter instances are cached PER (agent, conversation): any native session
+// state an adapter holds (DSH mirror session, MCP transport session, bridge
+// workspace, CLI cwd) is therefore conversation-scoped by construction.
+// One group = one project: memory can never bleed across conversations,
+// whatever adapter class the agent uses. The '' conv key is the CONTROL
+// PLANE (ping / probe) - it must never create conversation sessions.
+const adapters = new Map(); // `${agentId}::${convId || ''}` -> adapter instance
 
-function adapterFor(agent) {
-  if (!adapters.has(agent.id)) adapters.set(agent.id, createAdapter(agent));
-  return adapters.get(agent.id);
+function adapterKey(agentId, convId) {
+  return convId ? `${agentId}::${convId}` : `${agentId}::`;
 }
+
+function adapterFor(agent, convId = '') {
+  const k = adapterKey(agent.id, convId);
+  if (!adapters.has(k)) adapters.set(k, createAdapter(agent));
+  return adapters.get(k);
+}
+export { adapterFor };   // exported for the isolation regression test
 
 // Settings edits must land without a restart, or the user changes a model and
 // watches nothing happen. A turn already running keeps its own adapter reference,
 // so this only affects the next turn - which for DSH means a fresh session, the
 // honest consequence of changing how an agent is wired up.
 export function dropAdapter(agentId) {
-  adapters.delete(agentId);
+  for (const k of [...adapters.keys()]) {
+    if (k.startsWith(`${agentId}::`)) adapters.delete(k);   // every conversation + control plane
+  }
 }
 
 // Peer turns must never sit in the assistant channel. Tried labelling them
@@ -161,7 +175,7 @@ export async function dispatch({
       convId: conv.id,
       text: prompt,
       onAbort: () => {
-        const ad = adapterFor(agent);
+        const ad = adapterFor(agent, conv.id);
         if (typeof ad.cancel === 'function') ad.cancel();
       },
     });
@@ -178,7 +192,7 @@ export async function dispatch({
       // the history document can reproduce what the agent actually did, not
       // just the finished answer. Kept deliberately small (no raw tool output).
       const think = [];
-      const adapter = adapterFor(agent);
+      const adapter = adapterFor(agent, conv.id);
       const { text, nativeSessionId, contextLost, ask: newAsk, artifacts } = await adapter.send({
         agent,
         convId: conv.id,

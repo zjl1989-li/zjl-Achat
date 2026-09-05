@@ -212,8 +212,11 @@ export class DshAdapter {
     this.ports = cfg.ports || DSH_PORTS;
     this.cwd = cfg.cwd || process.cwd();
     this.baseURL = null;      // resolved lazily on first call
-    this.sessionId = null;    // native session mirror id
-    this.contextLost = false; // set when a cached session turns out to be dead
+    // Session state is PER CONVERSATION: the same DSH agent in two groups must
+    // not share one native session, or turns from one group leak into the
+    // other's context. convId -> { sessionId, contextLost }.
+    this.sessions = new Map();
+    this.activeSessionId = null; // session of the turn in flight (for cancel)
     this.maxWaitMs = cfg.maxWaitMs || 180000;
   }
 
@@ -276,27 +279,31 @@ export class DshAdapter {
   // A DSH restart keeps the port - and every other RPC - green, so ping() stays
   // happy while the session we cached is long gone. Verify before relying on it:
   // otherwise session.prompt fails and we sit there burning maxWaitMs.
-  async ensureSession(signal) {
-    if (this.sessionId) {
+  // Returns the conversation's session state { sessionId, contextLost }.
+  async ensureSession(signal, convId) {
+    const key = convId || 'default';
+    let st = this.sessions.get(key);
+    if (!st) { st = { sessionId: null, contextLost: false }; this.sessions.set(key, st); }
+    if (st.sessionId) {
       try {
-        await this.rpc('session.history', { sessionId: this.sessionId, maxMessages: 1 }, signal, 3000);
-        return this.sessionId;
+        await this.rpc('session.history', { sessionId: st.sessionId, maxMessages: 1 }, signal, 3000);
+        return st;
       } catch (e) {
         if (e.code !== 'session-not-found') throw e;  // real failure, don't mask it
-        this.sessionId = null;
-        this.contextLost = true;                      // next turn starts with no history
+        st.sessionId = null;
+        st.contextLost = true;                        // next turn starts with no history
       }
     }
     const created = await this.rpc('session.create', { cwd: this.cwd }, signal);
-    this.sessionId = created.sessionId;
-    return this.sessionId;
+    st.sessionId = created.sessionId;
+    return st;
   }
 
   // Highest seq currently in the session. Used as the baseline so a *previous*
   // turn's turn/end can never be mistaken for this turn finishing.
-  async currentSeq(signal) {
+  async currentSeq(signal, sessionId) {
     try {
-      const h = await this.rpc('session.history', { sessionId: await this.ensureSession(signal), maxMessages: 200 }, signal);
+      const h = await this.rpc('session.history', { sessionId, maxMessages: 200 }, signal);
       return (h.events || []).reduce((m, e) => Math.max(m, e.event?.seq ?? -1), -1);
     } catch {
       return -1;
@@ -305,16 +312,29 @@ export class DshAdapter {
 
   // Real cancel (verified 2026-08-31): DSH stops the running turn server-side.
   // Without this, aborting only stopped us waiting while DSH kept working.
+  // Only the turn in flight may be cancelled - beginTask() guarantees at most
+  // one per agent, so a single active-session pointer is unambiguous.
   cancel() {
-    if (!this.sessionId) return;
-    this.rpc('session.cancel', { sessionId: this.sessionId }).catch(() => {});
+    if (!this.activeSessionId) return;
+    const sid = this.activeSessionId;
+    this.rpc('session.cancel', { sessionId: sid }).catch(() => {});
   }
 
-  async send({ messages, signal, onEvent, peers, roster, allowDelegate, answerTo }) {
-    const sessionId = await this.ensureSession(signal);
-    const contextLost = this.contextLost;
-    this.contextLost = false;    // report the loss once, on the turn that hits it
-    const baseSeq = await this.currentSeq(signal);
+  async send({ convId, messages, signal, onEvent, peers, roster, allowDelegate, answerTo }) {
+    const st = await this.ensureSession(signal, convId);
+    this.activeSessionId = st.sessionId;
+    try {
+      return await this._turn({ st, messages, signal, onEvent, peers, roster, allowDelegate, answerTo });
+    } finally {
+      this.activeSessionId = null;
+    }
+  }
+
+  async _turn({ st, messages, signal, onEvent, peers, roster, allowDelegate, answerTo }) {
+    const sessionId = st.sessionId;
+    const contextLost = st.contextLost;
+    st.contextLost = false;      // report the loss once, on the turn that hits it
+    const baseSeq = await this.currentSeq(signal, sessionId);
     const text = lastUserText(messages);
 
     // session.prompt takes a single block, so what the agent cannot already see
@@ -616,6 +636,36 @@ function parseSse(body) {
   return out;
 }
 
+// Enumerate local TCP LISTENING ports, cross-platform (was netstat-only, which
+// silently returned nothing on Linux/macOS and killed ACP auto-discovery there).
+//   Windows: netstat -ano  ("TCP 0.0.0.0:8080 ... LISTENING 1234")
+//   Linux:   ss -tln       ("LISTEN 0 128 0.0.0.0:8080 ...")
+//   macOS:   lsof -nP -iTCP -sTCP:LISTEN  ("TCP *:8080 (LISTEN)")
+// Each tool falls through to the next on failure; a strict parse first, then a
+// tolerant LISTEN-line pass that grabs the local ":PORT" column.
+function listListeningPorts() {
+  const cmds = process.platform === 'win32'
+    ? ['netstat -ano']
+    : ['ss -tln', 'lsof -nP -iTCP -sTCP:LISTEN'];
+  const strict = /TCP\s+\S+:(\d+)\s+\S+\s+LISTENING\s+\d+/;  // windows netstat shape
+  for (const cmd of cmds) {
+    let out = '';
+    try { out = execSync(cmd, { encoding: 'utf8' }); } catch { continue; }
+    const ports = new Set();
+    for (const line of out.split('\n')) {
+      const m = line.match(strict);
+      if (m) { ports.add(Number(m[1])); continue; }
+      if (/LISTEN/.test(line)) {
+        for (const mm of line.matchAll(/[^\s]*:(\d+)(?=\s)/g)) ports.add(Number(mm[1]));
+      }
+    }
+    const list = [...ports].filter((p) => p > 0);
+    if (list.length) return list;
+  }
+  return [];
+}
+export { listListeningPorts };   // exported for the cross-platform regression test
+
 export class WbAcpAdapter {
   constructor(agent) {
     this.agent = agent;
@@ -655,13 +705,9 @@ export class WbAcpAdapter {
   // Fallback: the classic "Remote Control" / "codebuddy" title the service used
   // to expose. Returns the port or null (service not running).
   async discoverPort() {
-    let out = '';
-    try { out = execSync('netstat -ano', { encoding: 'utf8' }); } catch { return null; }
-    const ports = [];
-    for (const line of out.split('\n')) {
-      const m = line.match(/TCP\s+\S+:(\d+)\s+\S+\s+LISTENING\s+(\d+)/);
-      if (m) ports.push(Number(m[1]));
-    }
+    // A configured port skips the scan entirely: the user pinned it, honour it.
+    if (this.port) return this.port;
+    const ports = listListeningPorts();
     for (const port of ports) {
       const c = await this._probeConnect(port);
       if (c) { this.port = port; return port; }
