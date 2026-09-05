@@ -28,15 +28,29 @@ if (-not $NODE) {
 $EDGE = 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'
 $LOG  = Join-Path $ROOT 'desktop/tray-boot.log'
 
-# Default app-window geometry: WIN_SCALE of the primary working area,
-# centered. Tweak $WIN_SCALE (0.1 - 1.0) to taste; it applies to every
-# window (re)open path below (boot, tray menu, tray double-click).
-$WIN_SCALE = 0.8
+# Default app-window geometry: matches the WorkBuddy window (1405x1032),
+# centered on the primary working area. Applies to every window (re)open path.
+$WIN_W = 1405
+$WIN_H = 1032
 function Get-WinArgs {
   $a = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
-  $w = [int]($a.Width * $WIN_SCALE); $h = [int]($a.Height * $WIN_SCALE)
-  $x = [int]($a.X + ($a.Width - $w) / 2); $y = [int]($a.Y + ($a.Height - $h) / 2)
-  return @("--window-size=$w,$h", "--window-position=$x,$y")
+  $x = [int]($a.X + ($a.Width - $WIN_W) / 2); $y = [int]($a.Y + ($a.Height - $WIN_H) / 2)
+  return @("--window-size=$WIN_W,$WIN_H", "--window-position=$x,$y")
+}
+# Edge ignores --window-size when an Edge browser instance is already running
+# (the window is created by the existing process, which restores its own
+# remembered bounds). So after launching we poll for the app window and force
+# the geometry via Win32 MoveWindow. Keep 1405/1032 in sync with Get-WinArgs.
+Add-Type -Namespace Win32 -Name Move -MemberDefinition '[DllImport("user32.dll")] public static extern bool MoveWindow(System.IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);'
+function Set-WinGeometry {
+  $a = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+  $x = [int]($a.X + ($a.Width - $WIN_W) / 2); $y = [int]($a.Y + ($a.Height - $WIN_H) / 2)
+  $t = 0
+  while ($t -lt 20) {
+    Start-Sleep -Milliseconds 400; $t++
+    $procs = Get-Process msedge -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like '*Tmesh*' }
+    if ($procs) { foreach ($p in $procs) { [Win32.Move]::MoveWindow($p.MainWindowHandle, $x, $y, $WIN_W, $WIN_H, $true) | Out-Null }; return }
+  }
 }
 
 function Log($m) {
@@ -92,7 +106,7 @@ function Start-Server {
 function Start-Edge {
   if (Get-EdgeAppPid) { Log 'edge app already open, skip'; return $true }
   Log 'opening edge app window...'
-  try { Start-Process -FilePath $EDGE -ArgumentList (@("--app=$URL", "--new-window") + (Get-WinArgs)) -ErrorAction Stop; Log 'edge launched'; return $true }
+  try { Start-Process -FilePath $EDGE -ArgumentList (@("--app=$URL", "--new-window") + (Get-WinArgs)) -ErrorAction Stop; Log 'edge launched'; Set-WinGeometry; return $true }
   catch { Log "edge FAILED: $_"; return $false }
 }
 
@@ -134,7 +148,23 @@ $trayCode = { param($root, $node, $winArgs)
 
     $menu = New-Object System.Windows.Forms.ContextMenuStrip
     $openItem = $menu.Items.Add('打开 Tmesh')
-    $openItem.Add_Click({ param($s,$e) Start-Process -FilePath $EDGE -ArgumentList (@("--app=$URL", "--new-window") + $(if ($winArgs) { $winArgs } else { @() })) })
+    $openItem.Add_Click({ param($s,$e) Start-Process -FilePath $EDGE -ArgumentList (@("--app=$URL", "--new-window") + $(if ($winArgs) { $winArgs } else { @() })); Set-WinGeometry })
+
+    # local geometry enforcer (own Add-Type: the runspace has a fresh namespace)
+    $WIN_W = 1405; $WIN_H = 1032
+    function Set-WinGeometry {
+      try {
+        Add-Type -Namespace Win32 -Name Move -MemberDefinition '[DllImport("user32.dll")] public static extern bool MoveWindow(System.IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);'
+      } catch {}
+      $a = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+      $x = [int]($a.X + ($a.Width - $WIN_W) / 2); $y = [int]($a.Y + ($a.Height - $WIN_H) / 2)
+      $t = 0
+      while ($t -lt 20) {
+        Start-Sleep -Milliseconds 400; $t++
+        $procs = Get-Process msedge -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like '*Tmesh*' }
+        if ($procs) { foreach ($p in $procs) { [Win32.Move]::MoveWindow($p.MainWindowHandle, $x, $y, $WIN_W, $WIN_H, $true) | Out-Null }; return }
+      }
+    }
 
     $statusItem = $menu.Items.Add("状态：服务运行中（端口 $PORT）")
     $statusItem.Enabled = $false
@@ -153,7 +183,7 @@ $trayCode = { param($root, $node, $winArgs)
     })
 
     $tray.ContextMenuStrip = $menu
-    $tray.Add_DoubleClick({ param($s,$e) Start-Process -FilePath $EDGE -ArgumentList (@("--app=$URL", "--new-window") + $(if ($winArgs) { $winArgs } else { @() })) })
+    $tray.Add_DoubleClick({ param($s,$e) Start-Process -FilePath $EDGE -ArgumentList (@("--app=$URL", "--new-window") + $(if ($winArgs) { $winArgs } else { @() })); Set-WinGeometry })
     $tray.ShowBalloonTip(3000, 'Tmesh 智能体群聊', '已启动，常驻系统托盘（右键可退出）', 'Info')
 
     # ---- watchdog: auto-relaunch the server if it dies ----
