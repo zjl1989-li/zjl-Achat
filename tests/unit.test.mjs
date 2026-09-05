@@ -54,12 +54,15 @@ before(async () => {
   // Copy server/ without production data, plus public/ for static-serve tests.
   cpSync(join(ROOT, 'server'), join(tmp, 'server'), {
     recursive: true,
-    filter: (f) => !/(data\.json|avatars|space[\\/]|\.log|\.bak|\.corrupt|\.pre-optimize)$/.test(f),
+    filter: (f) => !/(data\.json|avatars|space[\\/]|\.log|\.bak|\.corrupt|\.pre-optimize|\.achat\.lock)$/.test(f),
   });
   cpSync(join(ROOT, 'public'), join(tmp, 'public'), {
     recursive: true,
     filter: (f) => !f.includes('.backup-'),
   });
+  // Regression: a stale lock (pid of a long-dead process) must be taken over,
+  // not brick startup. Covers the Windows kill(pid,0) quirk fix.
+  writeFileSync(join(tmp, 'server', '.achat.lock'), '999999999');
   writeFileSync(join(tmp, 'server', 'data.json'), JSON.stringify({
     revision: 0,
     savedAt: new Date().toISOString(),

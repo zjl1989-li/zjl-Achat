@@ -2,7 +2,7 @@
 // Zero dependencies, pure Node ESM. ASCII only.
 import http from 'node:http';
 import { readFileSync, existsSync, writeFileSync, mkdirSync, statSync, renameSync, unlinkSync, readdirSync, rmSync } from 'node:fs';
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, relative, isAbsolute } from 'node:path';
 import os from 'node:os';
@@ -40,15 +40,27 @@ const distillConclusion = (conv, msg, agents) => {
 // data.json writes. A pid lockfile makes the second instance exit early.
 // Best-effort: if the lock cannot be written we still start (never brick).
 const LOCK_FILE = join(__dirname, '.achat.lock');
+// Windows quirk: process.kill(pid, 0) does NOT throw for dead pids (libuv
+// treats signal 0 as a no-op probe), so pid reuse / stale locks would brick
+// startup forever. Ask the OS for the real process table there instead.
+function pidAlive(pid) {
+  if (process.platform !== 'win32') {
+    try { process.kill(pid, 0); return true; } catch { return false; }
+  }
+  try {
+    const out = execFileSync('tasklist', ['/FI', `PID eq ${pid}`, '/NH', '/FO', 'CSV'], {
+      stdio: ['ignore', 'pipe', 'ignore'], timeout: 3000,
+    }).toString();
+    return out.includes(`"${pid}"`);
+  } catch { return false; }
+}
 function acquireLock() {
   try {
     if (existsSync(LOCK_FILE)) {
       const prev = parseInt(readFileSync(LOCK_FILE, 'utf8'), 10);
       if (prev && prev !== process.pid) {
-        try {
-          process.kill(prev, 0);   // throws if the pid is not alive
-          return false;            // another instance is truly running
-        } catch { /* stale lock from a crashed process: take over */ }
+        if (pidAlive(prev)) return false; // another instance is truly running
+        /* stale lock from a crashed process: take over */
       }
     }
     writeFileSync(LOCK_FILE, String(process.pid));

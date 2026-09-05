@@ -2341,40 +2341,53 @@
     }
   }
 
-  // ---------------- 三库面板（左栏）：资料库 / 技能库 / 权限库 ----------------
+  // ---------------- 三库面板（左栏竖排 + 悬停浮出）：资料库 / 技能库 / 权限库 ----------------
   let libTab = 'kb';
   let libKbQuery = '';
   let libTimer = null;
+  let libCloseTimer = null;
 
   function initLibPanel() {
-    const head = $('#libHead'), panel = $('#libPanel');
-    if (!head || !panel) return;
-    // collapse mirrors the group-list section head
-    head.onclick = () => {
-      const collapsed = head.classList.toggle('collapsed');
-      panel.classList.toggle('hidden', collapsed);
+    const nav = $('#libNav'), fly = $('#libFlyout'), left = $('#left');
+    if (!nav || !fly || !left) return;
+    const hide = () => {
+      clearTimeout(libCloseTimer);
+      fly.classList.add('hidden');
+      nav.querySelectorAll('.lib-row.active').forEach((r) => r.classList.remove('active'));
     };
-    panel.querySelectorAll('.lib-tab').forEach((tab) => {
-      tab.onclick = () => {
-        panel.querySelectorAll('.lib-tab').forEach((t) => t.classList.remove('active'));
-        tab.classList.add('active');
-        libTab = tab.dataset.lib;
-        renderLib();
-      };
+    const openLib = (lib) => {
+      libTab = lib;
+      nav.querySelectorAll('.lib-row').forEach((r) => r.classList.toggle('active', r.dataset.lib === lib));
+      fly.classList.remove('hidden');
+      renderLib();
+    };
+    nav.querySelectorAll('.lib-row').forEach((row) => {
+      row.addEventListener('mouseenter', () => {
+        clearTimeout(libCloseTimer);
+        const lr = row.getBoundingClientRect(), ll = left.getBoundingClientRect();
+        fly.style.top = Math.max(4, lr.top - ll.top) + 'px';
+        if (fly.classList.contains('hidden') || libTab !== row.dataset.lib) openLib(row.dataset.lib);
+      });
+      row.addEventListener('mouseleave', () => { clearTimeout(libCloseTimer); libCloseTimer = setTimeout(hide, 260); });
+      row.addEventListener('click', () => { clearTimeout(libCloseTimer); openLib(row.dataset.lib); });
+    });
+    fly.addEventListener('mouseenter', () => clearTimeout(libCloseTimer));
+    fly.addEventListener('mouseleave', () => { clearTimeout(libCloseTimer); libCloseTimer = setTimeout(hide, 260); });
+    document.addEventListener('click', (ev) => {
+      if (!fly.contains(ev.target) && !nav.contains(ev.target)) hide();
     });
     $('#btnDistill').onclick = async () => {
       if (!curGroupId) { toast('先选一个群再蒸馏'); return; }
       try {
         const note = await api.distill(curGroupId);
         toast(`已沉淀进资料库：${note.title}（同名追加日期小节）`);
-        if (libTab === 'kb') renderLib();
+        if (libTab === 'kb' && !fly.classList.contains('hidden')) renderLib();
       } catch (e) { toast('蒸馏失败：' + e.message); }
     };
-    renderLib();
   }
 
   async function renderLib() {
-    const body = $('#libBody'), count = $('#libCount');
+    const body = $('#libBody');
     if (!body) return;
     body.innerHTML = '<div class="lib-empty">加载中…</div>';
     try {
@@ -2382,7 +2395,8 @@
       if (libTab === 'kb') n = await renderLibKb(body);
       else if (libTab === 'skills') n = await renderLibSkills(body);
       else n = await renderLibAcl(body);
-      if (count) count.textContent = n ? String(n) : '';
+      const badge = document.querySelector(`.lib-row[data-lib="${libTab}"] .lr-count`);
+      if (badge) badge.textContent = n ? String(n) : '';
     } catch (e) {
       body.innerHTML = `<div class="lib-empty">加载失败：${esc(e.message)}</div>`;
     }
