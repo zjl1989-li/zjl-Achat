@@ -1,6 +1,6 @@
 {
   "name": "zjl-achat",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "zjl-Achat - local-first multi-agent group chat hub (agent 群聊枢纽).",

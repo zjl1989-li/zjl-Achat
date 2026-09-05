@@ -3,11 +3,14 @@
 //   A class -> DshAdapter:    DSH Typert RPC (real agent: tools + skills)
 //   C class -> BridgeAdapter: file-bridge for closed-source products (§8.1①)
 // Node built-ins (node:fs/node:path) only - still zero EXTERNAL dependencies.
-import { join, isAbsolute } from 'node:path';
+import { join, isAbsolute, dirname } from 'node:path';
+import { pathToFileURL, fileURLToPath } from 'node:url';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, rmSync, readdirSync, statSync, unlinkSync } from 'node:fs';
 import { tmpdir, homedir } from 'node:os';
 import http from 'node:http';
 import { execSync, spawn } from 'node:child_process';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Pure ESM, zero dependencies, ASCII only.
 
@@ -51,6 +54,10 @@ export class ModelAdapter {
     // Same rule as probeAdapterType: the UI-edited top-level field wins.
     this.model = agent.model || cfg.model || 'deepseek-chat';
     this.key = cfg.apiKey || readEnvKey(cfg.apiKeyEnv) || readEnvKey('DEEPSEEK_API_KEY');
+    // Optional per-agent reply cap. Unset = provider default; some providers
+    // reject an explicit null, so the field is only sent when configured.
+    const mt = Number(cfg.maxTokens || cfg.max_tokens);
+    this.maxTokens = Number.isFinite(mt) && mt > 0 ? mt : null;
   }
 
   meta() {
@@ -115,6 +122,7 @@ export class ModelAdapter {
       stream: !!onDelta,
       temperature: 0.7,
     };
+    if (this.maxTokens) body.max_tokens = this.maxTokens;
     const res = await fetch(`${this.baseURL}/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.key}` },
@@ -1174,7 +1182,9 @@ export function extractCliReply(stdout) {
 // initialize -> notifications/initialized -> tools/list -> tools/call -> close.
 // Keeps process/transport lifetime inside the call so there is nothing to leak
 // across turns (achat refolds context each turn anyway).
-class McpClient {
+// Exported: plugin adapters that speak MCP stdio can reuse this client
+// instead of hand-rolling JSON-RPC framing.
+export class McpClient {
   constructor(mcp) {
     this.mcp = mcp;
     this.transport = mcp.url ? 'http' : 'stdio';
@@ -1230,12 +1240,34 @@ class McpClient {
 
   _requestStdio(method, params, timeoutMs) {
     const id = this.nextId++;
-    const p = new Promise((resolve, reject) => this._pending.set(id, { resolve, reject }));
+    // Hoist resolve/reject: the timeout and dead-pipe paths below must reject
+    // the SAME promise, and both fire outside the executor's scope. (Pre-fix
+    // code referenced the executor's `reject` from the timer callback - a
+    // ReferenceError that meant MCP timeouts never actually rejected.)
+    let resolve, reject;
+    const p = new Promise((res, rej) => { resolve = res; reject = rej; this._pending.set(id, { resolve, reject }); });
     const timer = setTimeout(() => {
-      if (this._pending.has(id)) { this._pending.delete(id); reject(new Error(`MCP request timeout: ${method}`)); }
+      if (this._pending.has(id)) {
+        this._pending.delete(id);
+        reject(new Error(`MCP request timeout: ${method}`));
+        // A timed-out stdio server keeps running and buffering stdout forever.
+        // close() in the caller's finally is best-effort; THIS is the guarantee -
+        // kill the process (tree) here so one slow tool call can't leak a process.
+        this._killChild();
+      }
     }, timeoutMs);
-    p.finally(() => clearTimeout(timer));
-    this._child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
+    // Clear the timer on settle. NOT p.finally(): the promise .finally()
+    // returns re-raises the rejection and nothing handles it - an
+    // unhandledRejection (process-fatal on modern Node) on every timeout.
+    p.then(() => clearTimeout(timer), () => clearTimeout(timer));
+    try {
+      this._child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
+    } catch (e) {
+      // EPIPE: the child died between start and write. Without this the pending
+      // entry never settles and the turn hangs until the socket times out.
+      if (this._pending.has(id)) { this._pending.delete(id); reject(e); }
+      this._killChild();
+    }
     return p;
   }
 
@@ -1292,8 +1324,26 @@ class McpClient {
   }
 
   async close() {
-    if (this._child) { try { this._child.kill(); } catch { /* ignore */ } }
+    this._killChild();
     this._rejectAll(new Error('MCP client closed'));
+  }
+
+  // Terminate the stdio child. kill() alone only signals the direct child - MCP
+  // servers routinely spawn their own subprocesses (node -> python, npx chains),
+  // which would survive as orphans. On Windows, taskkill /T /F takes the whole
+  // tree down; POSIX kill(-pid) does the same for a process-group leader.
+  _killChild() {
+    const c = this._child;
+    if (!c) return;
+    this._child = null; // first: a second kill call must be a no-op
+    try { c.kill(); } catch { /* already gone */ }
+    try {
+      if (process.platform === 'win32' && c.pid) {
+        execSync(`taskkill /PID ${c.pid} /T /F`, { stdio: 'ignore', timeout: 3000 });
+      } else if (c.pid) {
+        try { process.kill(-c.pid); } catch { /* not a group leader or gone */ }
+      }
+    } catch { /* best effort - the direct kill above usually suffices */ }
   }
 
   _rejectAll(err) {
@@ -1668,7 +1718,81 @@ export function describeProbe(agent) {
 }
 export function probeAdapterType(agent) { return describeProbe(agent).type; }
 
+// ---------- plugin adapters (adapters.d/, EchoBird-style manifest) ----------
+// A plugin is one folder under server/adapters.d/ with:
+//   plugin.json : { "id": "...", "description": "...",
+//                   "match": { "configKey": "myThing" },  // agent.config.myThing present -> this plugin wins
+//                   "module": "./adapter.mjs" }           // default-exports the adapter class
+//   adapter.mjs : export default class { constructor(agent) meta() ping() send() }
+// Manifests are read synchronously at first use; modules are imported once by
+// warmPlugins() at server boot so createAdapter() can stay synchronous
+// (bus.adapterFor() depends on that).
+let _pluginManifests = null;
+let _pluginClasses = []; // warmed: { manifest, Cls }
+
+function pluginManifests() {
+  if (_pluginManifests) return _pluginManifests;
+  _pluginManifests = [];
+  const dir = join(__dirname, 'adapters.d');
+  let entries = [];
+  try { entries = readdirSync(dir); } catch { return _pluginManifests; } // no dir = no plugins
+  for (const name of entries) {
+    const mf = join(dir, name, 'plugin.json');
+    try {
+      const m = JSON.parse(readFileSync(mf, 'utf8'));
+      if (!m.id || !m.module || !(m.match && m.match.configKey)) {
+        console.error(`[adapters.d] skip ${name}: plugin.json needs id, module and match.configKey`);
+        continue;
+      }
+      m._dir = join(dir, name);
+      _pluginManifests.push(m);
+    } catch (e) {
+      console.error(`[adapters.d] skip ${name}: ${e.message}`);
+    }
+  }
+  return _pluginManifests;
+}
+
+// Import every manifest's module once at boot. A broken plugin logs and is
+// skipped - one bad third-party adapter must never keep the hub down.
+export async function warmPlugins() {
+  _pluginClasses = [];
+  for (const m of pluginManifests()) {
+    try {
+      const mod = await import(pathToFileURL(join(m._dir, m.module)).href);
+      const Cls = mod.default || mod.Adapter;
+      if (typeof Cls !== 'function') throw new Error('module has no default export class');
+      _pluginClasses.push({ manifest: m, Cls });
+    } catch (e) {
+      console.error(`[adapters.d] plugin ${m.id} failed to load: ${e.message}`);
+    }
+  }
+  return _pluginClasses.map((p) => p.manifest.id);
+}
+
+export function listPlugins() {
+  return pluginManifests().map((m) => ({
+    id: m.id,
+    description: m.description || '',
+    match: m.match,
+    loaded: _pluginClasses.some((p) => p.manifest.id === m.id),
+  }));
+}
+
+function pluginFor(agent) {
+  const cfg = agent.config || {};
+  for (const p of _pluginClasses) {
+    const key = p.manifest.match && p.manifest.match.configKey;
+    if (key && cfg[key]) return p;
+  }
+  return null;
+}
+
 export function createAdapter(agent) {
+  // Plugins first: a manifest match is an explicit user decision and must
+  // outrank built-in type probing.
+  const hit = pluginFor(agent);
+  if (hit) return new hit.Cls(agent);
   const t = probeAdapterType(agent);
   if (t === 'A') return new DshAdapter(agent);
   if (t === 'W') {

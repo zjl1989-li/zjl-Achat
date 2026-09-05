@@ -9,7 +9,7 @@ import os from 'node:os';
 import { store } from './store.mjs';
 import { dispatch, probeAgent, isRunning, dropAdapter, runConsensus } from './bus.mjs';
 import { getStatus, allStatus, onStatus, setStatus, abort } from './runtime.mjs';
-import { describeProbe } from './adapters.mjs';
+import { describeProbe, warmPlugins, listPlugins } from './adapters.mjs';
 import { createKnowledge } from './memory/knowledge.mjs';
 import { createSkills } from './memory/skills.mjs';
 import { createAcl } from './memory/acl.mjs';
@@ -918,16 +918,37 @@ async function handleApi(req, res, url) {
   if (method === 'GET' && url.pathname === '/api/kb/recent') {
     return sendJson(res, 200, kb.recent(Number(url.searchParams.get('n')) || 10));
   }
+  if (method === 'GET' && url.pathname === '/api/kb/note') {
+    const title = url.searchParams.get('title') || '';
+    const note = kb.read(title);
+    return note ? sendJson(res, 200, note) : sendJson(res, 404, { error: 'note not found' });
+  }
   if (method === 'POST' && url.pathname === '/api/kb/note') {
     const b = await readBody(req);
     return sendJson(res, 200, kb.write({ title: b.title, body: b.body, tags: b.tags, source: b.source }));
   }
+  if (method === 'DELETE' && url.pathname === '/api/kb/note') {
+    const ok = kb.remove(url.searchParams.get('title') || '');
+    return ok ? sendJson(res, 200, { removed: true }) : sendJson(res, 404, { error: 'note not found' });
+  }
   if (method === 'GET' && url.pathname === '/api/skills') {
     return sendJson(res, 200, skills.list());
+  }
+  if (method === 'POST' && url.pathname === '/api/skills') {
+    const b = await readBody(req);
+    return sendJson(res, 200, skills.register(b));
+  }
+  if (method === 'DELETE' && url.pathname === '/api/skills') {
+    const ok = skills.remove(url.searchParams.get('id') || '');
+    return ok ? sendJson(res, 200, { removed: true }) : sendJson(res, 404, { error: 'skill not found' });
   }
   if (method === 'POST' && url.pathname === '/api/acl/grant') {
     const b = await readBody(req);
     return sendJson(res, 200, { granted: acl.grant(b) });
+  }
+  if (method === 'POST' && url.pathname === '/api/acl/revoke') {
+    const b = await readBody(req);
+    return sendJson(res, 200, { revoked: acl.revoke(b) });
   }
   if (method === 'GET' && url.pathname === '/api/acl/can') {
     const q = url.searchParams;
@@ -935,6 +956,11 @@ async function handleApi(req, res, url) {
   }
   if (method === 'GET' && url.pathname === '/api/acl/audit') {
     return sendJson(res, 200, acl.audit());
+  }
+  // Plugin adapters (adapters.d/) - list what the manifest scan found and
+  // whether each module actually loaded at boot.
+  if (method === 'GET' && url.pathname === '/api/adapters/plugins') {
+    return sendJson(res, 200, listPlugins());
   }
   // Distill pipe (L1 -> L2), manual path: digest a whole group, or pin one
   // exact message, into the knowledge base. Re-distilling the same group
@@ -1474,6 +1500,10 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, '127.0.0.1', async () => {
   console.log(`zjl-Achat on http://localhost:${PORT}`);
+  // Import plugin adapter modules once so createAdapter() can stay synchronous.
+  // A broken plugin logs and is skipped inside warmPlugins, never fatal.
+  const ids = await warmPlugins();
+  if (ids.length) console.log(`adapters.d plugins loaded: ${ids.join(', ')}`);
   // Fill in launchers the stored agents are missing (legacy agents onboarded
   // before auto-selection existed), then bring up whichever switches are ON.
   store.getAgents().forEach(ensureLauncher);

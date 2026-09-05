@@ -14,6 +14,21 @@
     <aside id="left">
       <div class="left-head"><button id="btnNewGroup">+ 新建群</button></div>
       <input id="groupSearch" class="group-search" type="search" placeholder="搜索群…" autocomplete="off" />
+      <div id="libHead" class="section-head" title="收起 / 展开三库（资料 · 技能 · 权限）">
+        <span class="sec-chevron">
+          <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
+        </span>
+        <span class="sec-title">三库</span>
+        <span class="sec-count" id="libCount"></span>
+      </div>
+      <div id="libPanel" class="lib-panel">
+        <div class="lib-tabs">
+          <button class="lib-tab active" data-lib="kb" title="资料库：沉淀的知识与群档（L2 语义记忆）">资料库</button>
+          <button class="lib-tab" data-lib="skills" title="技能库：各 agent 可声明调用的能力清单">技能库</button>
+          <button class="lib-tab" data-lib="acl" title="权限库：按群 × agent × 能力授权（默认拒绝）">权限库</button>
+        </div>
+        <div id="libBody" class="lib-body"></div>
+      </div>
       <div id="groupListHead" class="section-head" title="收起 / 展开群列表">
         <span class="sec-chevron">
           <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
@@ -58,6 +73,9 @@
         <div class="head-actions">
           <span class="avatars" id="memberAvatars"></span>
           <span class="ha-divider"></span>
+          <button id="btnDistill" title="一键蒸馏：把本群对话沉淀进资料库（同名群档追加日期小节，不覆盖不重复）">
+            <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.4 3h11.2l-4.2 5.1v4.7L6.6 12V8.1z"/></svg>
+          </button>
           <button id="btnConsensus" title="发起多 agent 协商 / 共识">
             <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.6" cy="5.4" r="2.2"/><circle cx="11.4" cy="6" r="1.8"/><path d="M2 13.4c0-2.1 1.6-3.6 3.6-3.6s3.6 1.5 3.6 3.6"/><path d="M10.6 10c1.6 0 3.4 1.3 3.4 3.2"/></svg>
           </button>
@@ -68,9 +86,9 @@
       </header>
       <div id="negotiationBar" class="negotiation-bar hidden"></div>
       <div id="messages" class="messages">
-        <div class="empty">← 从左侧选一个群，或直接新建群开始</div>
+        <div class="empty">从左侧选一个群，或直接新建群开始</div>
       </div>
-      <button id="jumpDown" class="jump-down hidden" title="回到最新消息">↓</button>
+      <button id="jumpDown" class="jump-down hidden" title="回到最新消息"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg></button>
       <button id="drawerToggle" title="群空间 · 产物">
         <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/></svg>
       </button>
@@ -131,14 +149,14 @@
   <!-- ============ MODAL: agent registry / access ============ -->
   <div id="settingsModal" class="modal hidden">
     <div class="modal-box">
-      <div class="modal-head">设置 <button id="closeSettings">✕</button></div>
+      <div class="modal-head">设置 <button id="closeSettings" class="icon-x" title="关闭"><svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4.2 4.2l7.6 7.6M11.8 4.2l-7.6 7.6"/></svg></button></div>
       <div id="agentRegistry" class="agent-registry"></div>
     </div>
   </div>
   <!-- ============ MODAL: onboard agent wizard ============ -->
   <div id="wizardModal" class="modal hidden">
     <div class="modal-box" style="max-width:580px">
-      <div class="modal-head"><button id="wizBackHead" class="wiz-back-head">← 返回</button><span id="wizTitle">接入 agent</span><button id="closeWizard">✕</button></div>
+      <div class="modal-head"><button id="wizBackHead" class="wiz-back-head"><svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3 5.5 8 10 13"/></svg> 返回</button><span id="wizTitle">接入 agent</span><button id="closeWizard" class="icon-x" title="关闭"><svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4.2 4.2l7.6 7.6M11.8 4.2l-7.6 7.6"/></svg></button></div>
       <div class="wstep hidden" data-step="pick">
         <div class="wiz-hint">本机检测到以下 agent，勾选要接入的：</div>
         <div id="discList" class="wiz-list"></div>
@@ -161,7 +179,7 @@
   <!-- ============ MODAL: connect mode card (foreign agents) ============ -->
   <div id="connectModal" class="modal hidden">
     <div class="modal-box" style="max-width:520px">
-      <div class="modal-head">连接方式 <button id="closeConnect">✕</button></div>
+      <div class="modal-head">连接方式 <button id="closeConnect" class="icon-x" title="关闭"><svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4.2 4.2l7.6 7.6M11.8 4.2l-7.6 7.6"/></svg></button></div>
       <div id="connectCardList" class="wiz-list"></div>
       <div class="wiz-actions"><button id="btnConnectDone" class="wbtn primary">按所选方式接入</button></div>
     </div>
@@ -169,7 +187,7 @@
   <!-- ============ MODAL: group settings ============ -->
   <div id="groupModal" class="modal hidden">
     <div class="modal-box">
-      <div class="modal-head">群设置 <button id="closeGroup">✕</button></div>
+      <div class="modal-head">群设置 <button id="closeGroup" class="icon-x" title="关闭"><svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4.2 4.2l7.6 7.6M11.8 4.2l-7.6 7.6"/></svg></button></div>
       <div class="field"><label>群名称</label><input id="grpNameInput" type="text" /></div>
       <div class="section-label" style="padding-left:0">成员 agent（勾选进群）</div>
       <div id="groupMembers" class="group-members"></div>
@@ -184,7 +202,7 @@
   <!-- ============ MODAL: consensus / negotiation ============ -->
   <div id="consensusModal" class="modal hidden">
     <div class="modal-box">
-      <div class="modal-head">发起多 agent 协商 <button id="closeConsensus">✕</button></div>
+      <div class="modal-head">发起多 agent 协商 <button id="closeConsensus" class="icon-x" title="关闭"><svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4.2 4.2l7.6 7.6M11.8 4.2l-7.6 7.6"/></svg></button></div>
       <div class="field"><label>议题</label><textarea id="csTopic" placeholder="要协商讨论的议题…（各 agent 将多轮交换立场直到达成共识）"></textarea></div>
       <div class="field"><label>协商轮次（每轮各 agent 看到前几轮立场后再更新观点）</label>
         <select id="csRounds"><option value="2">2 轮</option><option value="3" selected>3 轮</option><option value="4">4 轮</option><option value="5">5 轮</option></select></div>
@@ -206,7 +224,7 @@
         <div class="pop-name" id="ac-name">agent</div>
         <div class="pop-status" id="ac-status"><span class="dot"></span><span id="ac-status-text">unknown</span></div>
       </div>
-      <button id="ac-close" class="pop-x">✕</button>
+      <button id="ac-close" class="pop-x icon-x" title="关闭"><svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4.2 4.2l7.6 7.6M11.8 4.2l-7.6 7.6"/></svg></button>
     </div>
     <div class="pop-body" id="ac-body">
       <label>名称</label><input id="ac-in-name" type="text" />

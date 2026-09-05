@@ -68,6 +68,15 @@
     chevdown: '<path d="M4 6l4 4 4-4"/>',
     download: '<path d="M8 2.5v8M4.8 7.2 8 10.4l3.2-3.2"/><path d="M2.5 12.5v1.2h11v-1.2"/>',
     refresh: '<path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9"/><path d="M13.5 2.4v3.4h-3.4"/>',
+    x: '<path d="M4.2 4.2l7.6 7.6M11.8 4.2l-7.6 7.6"/>',
+    chevup: '<path d="M4 10l4-4 4 4"/>',
+    arrowl: '<path d="M10.5 3 5.5 8l5 5"/>',
+    arrowr: '<path d="M5.5 3l5 5-5 5"/>',
+    ext: '<path d="M6.5 3.5H3.2v9.3h9.3V9.5"/><path d="M9.5 2.5h4v4"/><path d="M13.5 2.5 8 8"/>',
+    deleg: '<path d="M5 3v5.5A2.5 2.5 0 0 0 7.5 11H12"/><path d="M9.5 8.5 12 11l-2.5 2.5"/>',
+    funnel: '<path d="M2.4 3h11.2l-4.2 5.1v4.7L6.6 12V8.1z"/>',
+    shield: '<path d="M8 1.8 13.4 4v4.2c0 3.2-2.3 5.3-5.4 6-3.1-.7-5.4-2.8-5.4-6V4z"/>',
+    book: '<path d="M2.6 3.2h4.2c.8 0 1.2.5 1.2 1.2v8.6c0-.7-.4-1.2-1.2-1.2H2.6z"/><path d="M13.4 3.2H9.2c-.8 0-1.2.5-1.2 1.2v8.6c0-.7.4-1.2 1.2-1.2h4.2z"/>',
   };
   // render an icon: ic('gear') -> inline <svg> sized 14x14 (override with w/h)
   const ic = (name, w, h) => {
@@ -383,6 +392,18 @@
       post('/conversations/' + groupId + '/messages', { text, toAgentId: opts.toAgentId }),
     startConsensus: (groupId, opts = {}) =>
       post('/conversations/' + groupId + '/consensus', opts),
+    // 三库 (memory layer REST)
+    kbSearch: (q, limit = 10) => req('/kb/search?q=' + encodeURIComponent(q) + '&limit=' + limit),
+    kbRecent: (n = 12) => req('/kb/recent?n=' + n),
+    kbRead: (title) => req('/kb/note?title=' + encodeURIComponent(title)),
+    kbRemove: (title) => del('/kb/note?title=' + encodeURIComponent(title)),
+    skillUpsert: (s) => post('/skills', s),
+    skillRemove: (id) => del('/skills?id=' + encodeURIComponent(id)),
+    aclGrant: (g) => post('/acl/grant', g),
+    aclRevoke: (g) => post('/acl/revoke', g),
+    aclAudit: () => req('/acl/audit'),
+    distill: (convId, messageId) => post('/memory/distill', messageId ? { convId, messageId } : { convId }),
+    plugins: () => req('/adapters/plugins'),
     subscribe,
     on,
   };
@@ -705,7 +726,7 @@
     if (!m.delegatedBy) return '';
     const a = findAgent(m.delegatedBy);
     const by = esc(a ? a.name : m.delegatedBy);
-    return `<span class="delegated" title="被 ${by} 点名后接手">↳ 被 ${by} 点名</span>`;
+    return `<span class="delegated" title="被 ${by} 点名后接手">${ic('deleg', 10, 10)} 被 ${by} 点名</span>`;
   }
 
   // An agent's question, rendered as an answerable card. Options come from DSH's
@@ -780,11 +801,11 @@
     b.classList.add('capped');
     const tg = document.createElement('button');
     tg.className = 'bubble-toggle';
-    tg.textContent = '展开全部 ▾';
+    tg.innerHTML = '展开全部 ' + ic('chevdown', 10, 10);
     tg.style.alignSelf = div.classList.contains('user') ? 'flex-end' : 'flex-start';
     tg.onclick = () => {
       const capped = b.classList.toggle('capped');
-      tg.textContent = capped ? '展开全部 ▾' : '收起 ▴';
+      tg.innerHTML = capped ? '展开全部 ' + ic('chevdown', 10, 10) : '收起 ' + ic('chevup', 10, 10);
     };
     b.insertAdjacentElement('afterend', tg);
   }
@@ -916,7 +937,7 @@
       } else if (e.kind === 'tool_call') {
         const done = e.state === 'done';
         const row = document.createElement('div'); row.className = 'tool-row' + (done ? ' done' : '');
-        row.innerHTML = (done ? '<span class="tick">✓</span>' : '<span class="spin"></span>') +
+        row.innerHTML = (done ? '<span class="tick">' + ic('check', 11, 11) + '</span>' : '<span class="spin"></span>') +
           `<span class="tn">${esc(e.name)}</span><span class="td">${esc(e.detail || '')}</span>`;
         body.appendChild(row);
       }
@@ -928,11 +949,11 @@
     const nTool = entries.filter((e) => e.kind === 'tool_call').length;
     return `<div class="thinking${collapsed ? ' collapsed' : ''}">
         <div class="thinking-head"><span class="th-ico">${ic('cpu', 12, 12)}</span><span class="th-title">思考 / 工具调用</span>
-          <span class="th-count">${nTool ? nTool + ' 次调用' : ''}</span><span class="th-toggle">▾</span></div>
+          <span class="th-count">${nTool ? nTool + ' 次调用' : ''}</span><span class="th-toggle">${ic('chevdown', 10, 10)}</span></div>
         <div class="thinking-body">${entries.map((e) => {
           if (e.kind === 'step') return `<div class="tool-step">步骤 ${esc(e.step)}</div>`;
           const done = e.state === 'done';
-          return `<div class="tool-row${done ? ' done' : ''}">${done ? '<span class="tick">✓</span>' : '<span class="spin"></span>'}<span class="tn">${esc(e.name)}</span><span class="td">${esc(e.detail || '')}</span></div>`;
+          return `<div class="tool-row${done ? ' done' : ''}">${done ? '<span class="tick">' + ic('check', 11, 11) + '</span>' : '<span class="spin"></span>'}<span class="tn">${esc(e.name)}</span><span class="td">${esc(e.detail || '')}</span></div>`;
         }).join('')}</div></div>`;
   }
 
@@ -948,7 +969,7 @@
     if (!panel) {
       panel = document.createElement('div');
       panel.className = 'thinking' + (traceStore[agentId].collapsed ? ' collapsed' : '');
-      panel.innerHTML = `<div class="thinking-head"><span class="th-ico">${ic('cpu', 12, 12)}</span><span class="th-title">思考 / 工具调用</span><span class="th-count"></span><span class="th-toggle">▾</span></div><div class="thinking-body"></div>`;
+      panel.innerHTML = `<div class="thinking-head"><span class="th-ico">${ic('cpu', 12, 12)}</span><span class="th-title">思考 / 工具调用</span><span class="th-count"></span><span class="th-toggle">${ic('chevdown', 10, 10)}</span></div><div class="thinking-body"></div>`;
       bubble.appendChild(panel);
       panel.querySelector('.thinking-head').onclick = () => {
         panel.classList.toggle('collapsed');
@@ -1051,14 +1072,14 @@
     row.style.paddingLeft = 6 + depth * 14 + 'px';
     if (entry.type === 'dir') {
       const isOpen = treeOpen.has(entry.path);
-      row.innerHTML = `<span class="tarrow">${isOpen ? '▾' : '▸'}</span><span class="tico">${ic('folder', 12, 12)}</span><span class="tname">${esc(entry.name)}</span><span class="tsize">${(entry.children || []).length} 项</span>`;
+      row.innerHTML = `<span class="tarrow">${isOpen ? ic('chevdown', 11, 11) : ic('arrowr', 11, 11)}</span><span class="tico">${ic('folder', 12, 12)}</span><span class="tname">${esc(entry.name)}</span><span class="tsize">${(entry.children || []).length} 项</span>`;
       const kids = document.createElement('div'); kids.style.display = isOpen ? 'block' : 'none';
       (entry.children || []).forEach((ch) => kids.appendChild(treeNode(ch, depth + 1)));
       row.onclick = () => {
         const open = kids.style.display !== 'none';
         kids.style.display = open ? 'none' : 'block';
         if (open) treeOpen.delete(entry.path); else treeOpen.add(entry.path);
-        row.querySelector('.tarrow').textContent = open ? '▸' : '▾';
+        row.querySelector('.tarrow').innerHTML = open ? ic('arrowr', 11, 11) : ic('chevdown', 11, 11);
       };
       const wrap = document.createElement('div'); wrap.appendChild(row); wrap.appendChild(kids);
       return wrap;
@@ -1112,13 +1133,13 @@
     const key = 'achat.browser.' + (curGroupId || '');
     const box = document.createElement('div'); box.className = 'browser-box';
     box.innerHTML = `<div class="browser-bar">
-        <button class="bbtn" id="brBack" title="后退">←</button>
-        <button class="bbtn" id="brFwd" title="前进">→</button>
-        <button class="bbtn" id="brReload" title="刷新">↻</button>
+        <button class="bbtn" id="brBack" title="后退">${ic('arrowl', 12, 12)}</button>
+        <button class="bbtn" id="brFwd" title="前进">${ic('arrowr', 12, 12)}</button>
+        <button class="bbtn" id="brReload" title="刷新">${ic('refresh', 12, 12)}</button>
         <input id="brUrl" placeholder="http://127.0.0.1:3080" />
         <button class="bbtn" id="brGo">前往</button>
         <button class="bbtn" id="brText" title="后端代抓为文本">文本</button>
-        <button class="bbtn" id="brOpen" title="新窗口打开">↗</button>
+        <button class="bbtn" id="brOpen" title="新窗口打开">${ic('ext', 12, 12)}</button>
       </div>
       <div class="browser-note" id="brNote">输入地址查看 agent 产出的本地网页。<br/>被 <code>X-Frame-Options / CSP</code> 拦截时会白屏，点「文本」让后端代抓。</div>
       <iframe id="brFrame" class="br-frame" style="display:none"></iframe>
@@ -1200,9 +1221,9 @@
     view.classList.remove('hidden');
     $('#spaceBody').classList.add('hidden');
     view.innerHTML = `<div class="av-head">
-        <button class="av-back" title="返回列表">←</button>
+        <button class="av-back" title="返回列表">${ic('arrowl', 12, 12)}</button>
         <span class="av-name" title="${esc(it.name)}">${esc(it.name)}</span>
-        <button class="av-act" title="在系统里打开">↗</button>
+        <button class="av-act" title="在系统里打开">${ic('ext', 12, 12)}</button>
       </div><div class="av-body"><div class="av-load">加载中…</div></div>`;
     view.querySelector('.av-back').onclick = closePreview;
     view.querySelector('.av-act').onclick = async () => {
@@ -1746,7 +1767,7 @@
       const ok = p.type === wiz.chosenType.key;
       hint.className = 'wiz-probe ' + (ok ? 'ok' : 'warn');
       // capability, not adapter class — the user never sees A/B/C/D/E/W
-      hint.textContent = ok ? '✓ 可以接入' : `⚠ 按已填信息，它会被当成「${capabilityOf(p.type)}」的 agent`;
+      hint.innerHTML = ok ? ic('check', 11, 11) + ' 可以接入' : ic('warn', 11, 11) + ' 按已填信息，它会被当成「' + esc(capabilityOf(p.type)) + '」的 agent';
     } catch { hint.textContent = ''; }
   }
   async function wizOnboardDiscovered() {
@@ -2315,6 +2336,193 @@
     }
   }
 
+  // ---------------- 三库面板（左栏）：资料库 / 技能库 / 权限库 ----------------
+  let libTab = 'kb';
+  let libKbQuery = '';
+  let libTimer = null;
+
+  function initLibPanel() {
+    const head = $('#libHead'), panel = $('#libPanel');
+    if (!head || !panel) return;
+    // collapse mirrors the group-list section head
+    head.onclick = () => {
+      const collapsed = head.classList.toggle('collapsed');
+      panel.classList.toggle('hidden', collapsed);
+    };
+    panel.querySelectorAll('.lib-tab').forEach((tab) => {
+      tab.onclick = () => {
+        panel.querySelectorAll('.lib-tab').forEach((t) => t.classList.remove('active'));
+        tab.classList.add('active');
+        libTab = tab.dataset.lib;
+        renderLib();
+      };
+    });
+    $('#btnDistill').onclick = async () => {
+      if (!curGroupId) { toast('先选一个群再蒸馏'); return; }
+      try {
+        const note = await api.distill(curGroupId);
+        toast(`已沉淀进资料库：${note.title}（同名追加日期小节）`);
+        if (libTab === 'kb') renderLib();
+      } catch (e) { toast('蒸馏失败：' + e.message); }
+    };
+    renderLib();
+  }
+
+  async function renderLib() {
+    const body = $('#libBody'), count = $('#libCount');
+    if (!body) return;
+    body.innerHTML = '<div class="lib-empty">加载中…</div>';
+    try {
+      let n = 0;
+      if (libTab === 'kb') n = await renderLibKb(body);
+      else if (libTab === 'skills') n = await renderLibSkills(body);
+      else n = await renderLibAcl(body);
+      if (count) count.textContent = n ? String(n) : '';
+    } catch (e) {
+      body.innerHTML = `<div class="lib-empty">加载失败：${esc(e.message)}</div>`;
+    }
+  }
+
+  async function renderLibKb(body) {
+    body.innerHTML = `
+      <div class="lib-search"><span class="ls-ico">${ic('search', 12, 12)}</span>
+        <input id="kbQ" type="search" placeholder="检索沉淀的知识…" value="${esc(libKbQuery)}" /></div>
+      <div class="lib-list" id="kbList"></div>`;
+    const list = body.querySelector('#kbList');
+    const items = libKbQuery ? await api.kbSearch(libKbQuery) : await api.kbRecent(12);
+    if (!items.length) {
+      list.innerHTML = `<div class="lib-empty">${libKbQuery ? '没有命中的笔记。' : '还没有沉淀。群聊顶栏点漏斗图标，把对话蒸馏进资料库。'}</div>`;
+    } else {
+      list.innerHTML = items.map((it) => `
+        <div class="lib-item" data-title="${esc(it.title)}">
+          <span class="lib-ico">${ic('book', 12, 12)}</span>
+          <span class="lib-main"><span class="lib-name">${esc(it.title)}</span>
+            ${it.snippet ? `<span class="lib-snippet">${esc(it.snippet)}</span>` : ''}</span>
+          <button class="lib-del" title="删除该笔记">${ic('trash', 11, 11)}</button>
+        </div>`).join('');
+      list.querySelectorAll('.lib-item').forEach((el) => {
+        el.onclick = async (ev) => {
+          if (ev.target.closest('.lib-del')) return;
+          await previewLibNote(el.dataset.title);
+        };
+      });
+      list.querySelectorAll('.lib-del').forEach((btn) => {
+        btn.onclick = async (ev) => {
+          ev.stopPropagation();
+          const title = btn.closest('.lib-item').dataset.title;
+          if (!confirm(`删除笔记「${title}」？`)) return;
+          try { await api.kbRemove(title); toast('已删除'); renderLib(); }
+          catch (e) { toast('删除失败：' + e.message); }
+        };
+      });
+    }
+    const input = body.querySelector('#kbQ');
+    input.oninput = () => {
+      libKbQuery = input.value.trim();
+      clearTimeout(libTimer);
+      libTimer = setTimeout(renderLib, 250);
+    };
+    return items.length;
+  }
+
+  // KB note preview: a lightweight dynamic modal, closed by click / Esc.
+  async function previewLibNote(title) {
+    let note;
+    try { note = await api.kbRead(title); } catch (e) { toast('读取失败：' + e.message); return; }
+    const wrap = document.createElement('div');
+    wrap.className = 'modal';
+    wrap.innerHTML = `<div class="modal-box" style="max-width:640px">
+        <div class="modal-head">${esc(note.title)} <button class="icon-x" title="关闭">${ic('x', 12, 12)}</button></div>
+        <pre class="lib-note-body">${esc(note.body)}</pre>
+      </div>`;
+    document.body.appendChild(wrap);
+    const close = () => wrap.remove();
+    wrap.querySelector('.icon-x').onclick = close;
+    wrap.onclick = (ev) => { if (ev.target === wrap) close(); };
+    document.addEventListener('keydown', function onEsc(ev) { if (ev.key === 'Escape') { close(); document.removeEventListener('keydown', onEsc); } });
+  }
+
+  async function renderLibSkills(body) {
+    const items = await req('/skills');
+    body.innerHTML = `
+      <div class="lib-list" id="skList"></div>
+      <div class="lib-form">
+        <div class="lib-form-title">注册技能（JSON 声明，改配置不改代码）</div>
+        <input id="skId" placeholder="id，如 daily-brief" />
+        <input id="skName" placeholder="名称（可省）" />
+        <textarea id="skPrompt" placeholder="prompt（技能正文，必须）或 tools"></textarea>
+        <button id="skSave" class="lib-save">保存技能</button>
+      </div>`;
+    const list = body.querySelector('#skList');
+    if (!items.length) list.innerHTML = '<div class="lib-empty">还没有技能。下方表单注册第一个。</div>';
+    else {
+      list.innerHTML = items.map((s) => `
+        <div class="lib-item" data-id="${esc(s.id)}">
+          <span class="lib-ico">${ic('plug', 12, 12)}</span>
+          <span class="lib-main"><span class="lib-name">${esc(s.name || s.id)}</span>
+            <span class="lib-snippet">${esc(s.desc || s.prompt || (s.tools || []).join(', ')).slice(0, 80)}</span></span>
+          <button class="lib-del" title="删除技能">${ic('trash', 11, 11)}</button>
+        </div>`).join('');
+      list.querySelectorAll('.lib-del').forEach((btn) => {
+        btn.onclick = async () => {
+          const id = btn.closest('.lib-item').dataset.id;
+          if (!confirm(`删除技能「${id}」？`)) return;
+          try { await api.skillRemove(id); renderLib(); } catch (e) { toast('删除失败：' + e.message); }
+        };
+      });
+    }
+    body.querySelector('#skSave').onclick = async () => {
+      const id = body.querySelector('#skId').value.trim();
+      const name = body.querySelector('#skName').value.trim();
+      const prompt = body.querySelector('#skPrompt').value.trim();
+      if (!id || !prompt) { toast('id 和 prompt 必填'); return; }
+      try { await api.skillUpsert({ id, name, prompt }); toast('技能已保存'); renderLib(); }
+      catch (e) { toast('保存失败：' + e.message); }
+    };
+    return items.length;
+  }
+
+  async function renderLibAcl(body) {
+    const [trail, groups, agents] = await Promise.all([api.aclAudit(), api.listGroups(), api.listAgents()]);
+    body.innerHTML = `
+      <div class="lib-list" id="aclList"></div>
+      <div class="lib-form">
+        <div class="lib-form-title">新增授权（群 × agent × 能力，默认拒绝）</div>
+        <select id="aclConv"><option value="">选群…</option>${groups.map((g) => `<option value="${esc(g.id)}">${esc(g.name)}</option>`).join('')}</select>
+        <select id="aclAgent"><option value="">选 agent…</option>${agents.map((a) => `<option value="${esc(a.id)}">${esc(a.name)}</option>`).join('')}</select>
+        <input id="aclCap" placeholder="能力名，如 kb.write / shell.run" />
+        <button id="aclSave" class="lib-save">授权</button>
+      </div>`;
+    const list = body.querySelector('#aclList');
+    if (!trail.length) list.innerHTML = '<div class="lib-empty">还没有授权记录。所有能力默认拒绝。</div>';
+    else {
+      const nameOf = (id) => { const a = agents.find((x) => x.id === id); return a ? a.name : id; };
+      const gNameOf = (id) => { const g = groups.find((x) => x.id === id); return g ? g.name : (id === '*' ? '全部群' : id); };
+      list.innerHTML = trail.map((g, i) => `
+        <div class="lib-item" data-i="${i}">
+          <span class="lib-ico">${ic('shield', 12, 12)}</span>
+          <span class="lib-main"><span class="lib-name">${esc(gNameOf(g.convId))} · ${esc(nameOf(g.agentId))} · ${esc(g.cap)}</span>
+            <span class="lib-snippet">由 ${esc(g.grantedBy || '未知')} 授权于 ${g.ts ? new Date(g.ts).toLocaleString() : ''}</span></span>
+          <button class="lib-del" title="撤销该授权">${ic('x', 11, 11)}</button>
+        </div>`).join('');
+      list.querySelectorAll('.lib-del').forEach((btn) => {
+        btn.onclick = async () => {
+          const g = trail[Number(btn.closest('.lib-item').dataset.i)];
+          try { await api.aclRevoke(g); renderLib(); } catch (e) { toast('撤销失败：' + e.message); }
+        };
+      });
+    }
+    body.querySelector('#aclSave').onclick = async () => {
+      const convId = body.querySelector('#aclConv').value;
+      const agentId = body.querySelector('#aclAgent').value;
+      const cap = body.querySelector('#aclCap').value.trim();
+      if (!convId || !agentId || !cap) { toast('群、agent、能力三项都要选/填'); return; }
+      try { await api.aclGrant({ convId, agentId, cap, grantedBy: 'user' }); toast('已授权'); renderLib(); }
+      catch (e) { toast('授权失败：' + e.message); }
+    };
+    return trail.length;
+  }
+
   // ---------------- boot ----------------
   boot();
   async function boot() {
@@ -2325,6 +2533,7 @@
     // app used to show three blank columns until you clicked a group.
     const list = await api.listGroups();
     if (list.length) await selectGroup(list[0].id);
+    initLibPanel();
     await showRecoveryNotice();
   }
 

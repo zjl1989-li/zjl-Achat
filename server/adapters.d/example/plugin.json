@@ -1,0 +1,6 @@
+{
+  "id": "example-echo",
+  "description": "Echo adapter: smallest working example of the plugin contract. Activated on any agent whose config contains \"exampleEcho\": true.",
+  "match": { "configKey": "exampleEcho" },
+  "module": "./adapter.mjs"
+}

@@ -113,3 +113,43 @@ test('listListeningPorts: cross-platform enumeration returns sane ports', () => 
   // parent chain listening somewhere; on any CI runner something listens.
   // Do not assert non-empty though: a locked-down sandbox may hide them all.
 });
+
+// ---------- model max_tokens config (per-agent reply cap) ----------
+test('ModelAdapter: maxTokens parses per-agent config, unset means null', async () => {
+  const { ModelAdapter } = await import('../server/adapters.mjs');
+  const mk = (cfg) => new ModelAdapter({ id: 't', name: 'T', type: 'B', config: { apiKey: 'k', ...cfg } });
+  assert.equal(mk({ maxTokens: 2048 }).maxTokens, 2048);
+  assert.equal(mk({ maxTokens: '4096' }).maxTokens, 4096); // string form is fine
+  assert.equal(mk({}).maxTokens, null);                    // unset -> field never sent
+  assert.equal(mk({ maxTokens: 0 }).maxTokens, null);      // 0 is not a cap
+  assert.equal(mk({ maxTokens: 'abc' }).maxTokens, null);  // garbage -> ignore
+  assert.equal(mk({ maxTokens: -5 }).maxTokens, null);
+});
+
+// ---------- MCP stdio timeout kills the child (no orphaned servers) ----------
+// Uses a FAKE child (in-memory doubles with a no-op stdin/kill): a real
+// `setInterval` server would keep the test runner's event loop hostage, and
+// taskkill via execSync can block under sandboxes. The kill *mechanism*
+// (reject + handle nulled + kill() invoked) is what is under test here.
+test('McpClient: stdio request timeout kills the child process tree', async () => {
+  const { McpClient } = await import('../server/adapters.mjs');
+  const c = new McpClient({ command: 'never-spawned' });
+  let killed = 0;
+  c._child = { pid: null, killed: 0, kill() { this.killed = ++killed; }, stdin: { write() {} } };
+  await assert.rejects(() => c.request('tools/list', {}, 60), /timeout/);
+  assert.equal(c._child, null, 'handle must be released after timeout');
+  assert.equal(killed, 1, 'child.kill must be invoked on timeout');
+});
+
+test('McpClient: dead-pipe write rejects instead of hanging forever', async () => {
+  const { McpClient } = await import('../server/adapters.mjs');
+  const c = new McpClient({ command: 'never-spawned' });
+  let killed = 0;
+  c._child = {
+    pid: null, kill() { killed++; },
+    stdin: { write() { throw new Error('EPIPE'); } },
+  };
+  await assert.rejects(() => c.request('tools/list', {}, 5000), /EPIPE/);
+  assert.equal(c._child, null, 'broken pipe must take the child down');
+  assert.equal(killed, 1);
+});
