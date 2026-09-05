@@ -28,6 +28,17 @@ if (-not $NODE) {
 $EDGE = 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'
 $LOG  = Join-Path $ROOT 'desktop/tray-boot.log'
 
+# Default app-window geometry: WIN_SCALE of the primary working area,
+# centered. Tweak $WIN_SCALE (0.1 - 1.0) to taste; it applies to every
+# window (re)open path below (boot, tray menu, tray double-click).
+$WIN_SCALE = 0.8
+function Get-WinArgs {
+  $a = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+  $w = [int]($a.Width * $WIN_SCALE); $h = [int]($a.Height * $WIN_SCALE)
+  $x = [int]($a.X + ($a.Width - $w) / 2); $y = [int]($a.Y + ($a.Height - $h) / 2)
+  return @("--window-size=$w,$h", "--window-position=$x,$y")
+}
+
 function Log($m) {
   try { "[$(Get-Date -Format 'HH:mm:ss')] $m" | Out-File -Append -FilePath $LOG -Encoding utf8 } catch {}
 }
@@ -81,7 +92,7 @@ function Start-Server {
 function Start-Edge {
   if (Get-EdgeAppPid) { Log 'edge app already open, skip'; return $true }
   Log 'opening edge app window...'
-  try { Start-Process -FilePath $EDGE -ArgumentList "--app=$URL","--new-window" -ErrorAction Stop; Log 'edge launched'; return $true }
+  try { Start-Process -FilePath $EDGE -ArgumentList (@("--app=$URL", "--new-window") + (Get-WinArgs)) -ErrorAction Stop; Log 'edge launched'; return $true }
   catch { Log "edge FAILED: $_"; return $false }
 }
 
@@ -102,7 +113,7 @@ if (-not $serverOk) { Log 'WARN: server not up; tray still starts so you can ret
 # Application.Run() never blocks). Running the scriptblock inside an STA
 # PowerShell runspace is the supported way to host WinForms from PowerShell
 # and makes Application.Run() actually block until Exit.
-$trayCode = { param($root, $node)
+$trayCode = { param($root, $node, $winArgs)
   try {
     Add-Type -AssemblyName System.Windows.Forms
     Add-Type -AssemblyName System.Drawing
@@ -123,7 +134,7 @@ $trayCode = { param($root, $node)
 
     $menu = New-Object System.Windows.Forms.ContextMenuStrip
     $openItem = $menu.Items.Add('打开 Tmesh')
-    $openItem.Add_Click({ param($s,$e) Start-Process -FilePath $EDGE -ArgumentList "--app=$URL","--new-window" })
+    $openItem.Add_Click({ param($s,$e) Start-Process -FilePath $EDGE -ArgumentList (@("--app=$URL", "--new-window") + $winArgs) })
 
     $statusItem = $menu.Items.Add("状态：服务运行中（端口 $PORT）")
     $statusItem.Enabled = $false
@@ -142,7 +153,7 @@ $trayCode = { param($root, $node)
     })
 
     $tray.ContextMenuStrip = $menu
-    $tray.Add_DoubleClick({ param($s,$e) Start-Process -FilePath $EDGE -ArgumentList "--app=$URL","--new-window" })
+    $tray.Add_DoubleClick({ param($s,$e) Start-Process -FilePath $EDGE -ArgumentList (@("--app=$URL", "--new-window") + $winArgs) })
     $tray.ShowBalloonTip(3000, 'Tmesh 智能体群聊', '已启动，常驻系统托盘（右键可退出）', 'Info')
 
     # ---- watchdog: auto-relaunch the server if it dies ----
@@ -192,7 +203,7 @@ try {
   $rs.Open()
   $ps = [System.Management.Automation.PowerShell]::Create()
   $ps.Runspace = $rs
-  [void]$ps.AddScript($trayCode).AddArgument($ROOT).AddArgument($NODE)
+  [void]$ps.AddScript($trayCode).AddArgument($ROOT).AddArgument($NODE).AddArgument((Get-WinArgs))
   Log 'tray runspace opened (STA), invoking'
   $async = $ps.BeginInvoke()
   Log 'tray running, main thread waiting...'

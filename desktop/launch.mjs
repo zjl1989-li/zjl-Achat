@@ -51,7 +51,7 @@ async function main() {
       process.exit(1);
     }
   }
-  spawn(findEdge(), [`--app=http://${HOST}:${PORT}`, '--new-window'], {
+  spawn(findEdge(), [`--app=http://${HOST}:${PORT}`, '--new-window', '--window-size=1405,1032'], {
     detached: true, stdio: 'ignore', windowsHide: true,
   }).unref();
   process.exit(0);

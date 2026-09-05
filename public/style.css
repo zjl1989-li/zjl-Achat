@@ -49,23 +49,16 @@ button, input, select, textarea { font-family: inherit; }
 .resizer { flex: 0 0 4px; align-self: stretch; cursor: col-resize; background: transparent; position: relative; z-index: 8; transition: background .12s; }
 .resizer::after { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; transform: translateX(-50%); width: 1px; background: var(--border); transition: background .12s; }
 .resizer:hover::after, .resizer.active::after { background: var(--accent); }
-/* fold button: a small vertical pill on the hairline; hidden until the rail
-   is hovered (or the rail is folded, when it must stay reachable). */
-.resizer .fold-btn { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); width: 16px; height: 34px; padding: 0; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--panel2); color: var(--muted); cursor: pointer; z-index: 9; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity .12s, color .12s, border-color .12s, transform .15s; }
-.resizer:hover .fold-btn, .resizer .fold-btn:hover, .fold-btn.folded { opacity: 1; }
-.resizer .fold-btn:hover { color: var(--accent); border-color: var(--accent); }
-.resizer .fold-btn svg { flex: 0 0 auto; transition: transform .18s; }
+/* fold buttons now live in the center header (far left / far right corner),
+   styled like the other head-actions icon buttons; chevron flips when folded. */
+#chatHead .fold-btn { flex: 0 0 auto; background: var(--panel2); color: var(--text); border: 1px solid var(--border); border-radius: var(--r-md); width: 30px; height: 30px; padding: 0; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+#chatHead .fold-btn:hover { border-color: var(--accent); color: var(--accent); }
+#chatHead .fold-btn svg { flex: 0 0 auto; transition: transform .18s; }
 body.left-fold #foldLeft svg { transform: rotate(180deg); }
 body.right-fold #foldRight svg { transform: rotate(180deg); }
-/* folded rails collapse to zero width; the hairline + fold button stay */
+/* folded rails collapse to zero width */
 body.left-fold #left { flex-basis: 0; border-right: none; overflow: hidden; }
 body.right-fold #right { flex-basis: 0; border-left: none; overflow: hidden; }
-/* folded rail pins the hairline to the viewport edge, which would clip the pill
-   in half - shift it inward so it stays fully visible and clickable. */
-body.left-fold #foldLeft { transform: translate(0,-50%); }
-body.right-fold #foldRight { transform: translate(-100%,-50%); }
-/* the hairline is only 4px wide; widen the pill's hit area so it can be found. */
-.resizer .fold-btn::before { content: ''; position: absolute; inset: -8px -9px; }
 
 /* ---------- LEFT ---------- */
 #left { flex: 0 0 var(--left-w); min-width: 0; min-height: 0; position: relative; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
