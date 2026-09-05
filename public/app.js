@@ -2550,6 +2550,42 @@
     if (!ver) return;
     api.version().then((r) => { ver.textContent = 'v' + r.version; }).catch(() => { ver.textContent = ''; });
     $('#btnCheckUpdate').onclick = () => checkUpdate(false);
+    $('#btnPlugins').onclick = openPluginsModal;
+  }
+
+  // Read-only plugin inventory: install/uninstall stays a folder operation
+  // (server/adapters.d/), activation stays an agent-config key. The UI only
+  // answers "what is installed, how do I turn it on, did it load".
+  async function openPluginsModal() {
+    const wrap = document.createElement('div');
+    wrap.className = 'modal';
+    wrap.innerHTML = `<div class="modal-box" style="max-width:560px">
+        <div class="modal-head">已装适配器插件 <button class="icon-x" title="关闭">${ic('x', 12, 12)}</button></div>
+        <div class="plug-list"><div class="lib-empty">加载中…</div></div>
+        <div class="plug-hint">安装 = 在 server/adapters.d/ 下放插件文件夹（plugin.json + adapter.mjs）；卸载 = 删文件夹；重启后生效。启用 = 在 agent 配置里加对应的 configKey。</div>
+      </div>`;
+    document.body.appendChild(wrap);
+    const close = () => wrap.remove();
+    wrap.querySelector('.icon-x').onclick = close;
+    wrap.onclick = (ev) => { if (ev.target === wrap) close(); };
+    document.addEventListener('keydown', function onEsc(ev) { if (ev.key === 'Escape') { close(); document.removeEventListener('keydown', onEsc); } });
+    const list = wrap.querySelector('.plug-list');
+    try {
+      const items = await api.plugins();
+      if (!items.length) {
+        list.innerHTML = '<div class="lib-empty">还没有插件。把插件文件夹放进 server/adapters.d/ 即可，参考自带的 example。</div>';
+        return;
+      }
+      list.innerHTML = items.map((p) => `
+        <div class="plug-item">
+          <div class="plug-head"><span class="plug-id">${esc(p.id)}</span>
+            <span class="plug-state ${p.loaded ? 'on' : 'off'}">${p.loaded ? '已加载' : '未加载'}</span></div>
+          <div class="plug-desc">${esc(p.description || '（无描述）')}</div>
+          <div class="plug-match">激活：agent 配置加 <code>"${esc((p.match && p.match.configKey) || '?')}": true</code></div>
+        </div>`).join('');
+    } catch (e) {
+      list.innerHTML = `<div class="lib-empty">加载失败：${esc(e.message)}</div>`;
+    }
   }
 
   async function checkUpdate(auto) {

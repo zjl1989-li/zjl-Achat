@@ -818,6 +818,18 @@ body.drawer-open #resRight { display: block; }
 .about-bar { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-top: 1px solid var(--border); background: var(--panel2); position: sticky; bottom: 0; }
 .about-ver { font-size: 12px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
 .about-btn { padding: 5px 14px; font-size: 11px; border-radius: var(--r-pill); border: 1px solid var(--border); background: var(--panel3); color: var(--muted); cursor: pointer; transition: all .12s; }
+/* read-only plugin inventory (settings modal) */
+.plug-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.plug-item { border: 1px solid var(--border); border-radius: var(--r-md); padding: 9px 11px; background: var(--panel2); }
+.plug-head { display: flex; align-items: center; gap: 8px; }
+.plug-id { font-weight: 600; font-size: 12.5px; color: var(--text); }
+.plug-state { font-size: 10.5px; padding: 1px 8px; border-radius: var(--r-pill); border: 1px solid var(--border); }
+.plug-state.on { color: var(--accent); border-color: var(--accent); }
+.plug-state.off { color: var(--muted); }
+.plug-desc { font-size: 11.5px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+.plug-match { font-size: 11px; color: var(--text); margin-top: 5px; }
+.plug-match code { background: var(--panel3); padding: 1px 5px; border-radius: var(--r-sm); font-size: 10.5px; }
+.plug-hint { font-size: 11px; color: var(--muted); margin-top: 10px; line-height: 1.6; }
 .about-btn:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
 .about-btn:disabled { opacity: .5; cursor: default; }
 .about-btn.apply { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
