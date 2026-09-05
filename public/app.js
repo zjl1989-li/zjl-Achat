@@ -2228,6 +2228,7 @@
   makeResizer($('#resRight'), 'right');
 
   // fold / expand the side rails via the pill on each hairline divider
+  // state is remembered per side; first run = right rail folded, left open
   function makeFoldBtn(btn, side) {
     if (!btn) return;
     btn.addEventListener('mousedown', (e) => e.stopPropagation()); // don't start a drag
@@ -2236,10 +2237,17 @@
       const foldCls = side === 'left' ? 'left-fold' : 'right-fold';
       const folded = document.body.classList.toggle(foldCls);
       btn.classList.toggle('folded', folded);
+      localStorage.setItem('zjl_' + side + '_fold', folded ? '1' : '0');
     });
   }
   makeFoldBtn($('#foldLeft'), 'left');
   makeFoldBtn($('#foldRight'), 'right');
+  [['left', '0'], ['right', '1']].forEach(([side, dflt]) => {
+    if ((localStorage.getItem('zjl_' + side + '_fold') ?? dflt) === '1') {
+      document.body.classList.add(side + '-fold');
+      document.getElementById(side === 'left' ? 'foldLeft' : 'foldRight')?.classList.add('folded');
+    }
+  });
 
   // 右栏分标签切换（刷新后记住上次停留的标签）
   $$('#spaceTabs .stab').forEach((t) => {
