@@ -48,6 +48,8 @@ node server/server.mjs
 
 系统托盘常驻（可选，Windows + PowerShell 5.1）：运行 `desktop/tray.ps1`，右键托盘图标打开/退出，内置 30 秒看门狗自动重启服务。
 
+**应用内更新**：设置弹窗底部一键检查 GitHub 最新 release；有新版可直接在 UI 内安全更新（拒绝脏工作区 / 分叉历史，fast-forward-only + 自重启），本地改动永不被覆盖。
+
 ## 三库（左侧栏）
 
 - **资料库**：检索 / 预览 / 删除沉淀笔记（Obsidian `.md` 本地仓，`server/kb/`，直接用 Obsidian 打开这个文件夹就是你的知识库）

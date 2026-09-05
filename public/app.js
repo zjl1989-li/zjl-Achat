@@ -404,6 +404,11 @@
     aclAudit: () => req('/acl/audit'),
     distill: (convId, messageId) => post('/memory/distill', messageId ? { convId, messageId } : { convId }),
     plugins: () => req('/adapters/plugins'),
+    // self-update
+    version: () => req('/version'),
+    updateCheck: () => req('/update/check'),
+    updateApply: () => post('/update/apply', {}),
+    updateRestart: () => post('/update/restart', {}),
     subscribe,
     on,
   };
@@ -2523,6 +2528,82 @@
     return trail.length;
   }
 
+  // ---------------- 关于 / 检查更新（设置弹窗底部） ----------------
+  let applyReady = false;
+
+  function initAbout() {
+    const ver = $('#aboutVer');
+    if (!ver) return;
+    api.version().then((r) => { ver.textContent = 'v' + r.version; }).catch(() => { ver.textContent = ''; });
+    $('#btnCheckUpdate').onclick = () => checkUpdate(false);
+  }
+
+  async function checkUpdate(auto) {
+    const msg = $('#aboutMsg'), check = $('#btnCheckUpdate'), apply = $('#btnApplyUpdate');
+    check.disabled = true;
+    msg.textContent = '检查中…';
+    try {
+      const r = await api.updateCheck();
+      if (!r.isNewer) {
+        msg.textContent = '已是最新版本';
+        apply.classList.add('hidden');
+        applyReady = false;
+      } else {
+        msg.innerHTML = `发现新版 <b>${esc(r.latest)}</b>${r.publishedAt ? ' · ' + esc(String(r.publishedAt).slice(0, 10)) : ''} · <a href="${esc(r.url)}" target="_blank" rel="noopener">更新日志</a>`;
+        apply.textContent = '一键更新';
+        apply.classList.remove('hidden');
+        applyReady = true;
+      }
+    } catch (e) {
+      msg.textContent = '检查失败（网络不通可手动 git pull）';
+      apply.classList.add('hidden');
+      applyReady = false;
+    } finally {
+      check.disabled = false;
+      if (!applyReady) return;
+      // bind once per discovery: each check rewrites the button state
+      apply.onclick = () => doApply();
+    }
+  }
+
+  async function doApply() {
+    const msg = $('#aboutMsg'), apply = $('#btnApplyUpdate');
+    apply.disabled = true;
+    msg.textContent = '更新中…';
+    const r = await api.updateApply().catch((e) => ({ ok: false, code: 'error', message: e.message }));
+    if (!r.ok) {
+      const why = {
+        dirty: '本地有未提交改动，已拒绝更新（先 git stash / commit）',
+        diverged: '本地历史已分叉，已拒绝更新（手动处理）',
+        network: 'git fetch 失败（离线？），可手动 git pull',
+        'git-missing': 'git 不可用：' + (r.message || ''),
+        error: r.message || '更新失败',
+      }[r.code] || '更新失败';
+      msg.textContent = why + (r.files && r.files.length ? '：' + r.files.slice(0, 3).join('、') : '');
+      apply.disabled = false;
+      return;
+    }
+    if (!r.updated) {
+      msg.textContent = '已是最新版本';
+      apply.classList.add('hidden');
+      apply.disabled = false;
+      return;
+    }
+    msg.textContent = '已更新到 v' + r.version + '，重启服务生效…';
+    apply.classList.add('hidden');
+    const cur = r.version;
+    await api.updateRestart().catch(() => {});
+    // The server dies for ~2s then comes back fresh; poll until it answers
+    // with the new version (or give up after a minute and just reload).
+    const deadline = Date.now() + 60000;
+    const timer = setInterval(async () => {
+      try {
+        const v = await api.version();
+        if (v.version === cur || Date.now() > deadline) { clearInterval(timer); location.reload(); }
+      } catch { /* down during restart - keep polling */ }
+    }, 2000);
+  }
+
   // ---------------- boot ----------------
   boot();
   async function boot() {
@@ -2534,6 +2615,7 @@
     const list = await api.listGroups();
     if (list.length) await selectGroup(list[0].id);
     initLibPanel();
+    initAbout();
     await showRecoveryNotice();
   }
 

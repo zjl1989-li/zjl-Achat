@@ -10,6 +10,7 @@ import { store } from './store.mjs';
 import { dispatch, probeAgent, isRunning, dropAdapter, runConsensus } from './bus.mjs';
 import { getStatus, allStatus, onStatus, setStatus, abort } from './runtime.mjs';
 import { describeProbe, warmPlugins, listPlugins } from './adapters.mjs';
+import { getCurrentVersion, checkLatest, applyUpdate, restartSelf } from './updater.mjs';
 import { createKnowledge } from './memory/knowledge.mjs';
 import { createSkills } from './memory/skills.mjs';
 import { createAcl } from './memory/acl.mjs';
@@ -961,6 +962,25 @@ async function handleApi(req, res, url) {
   // whether each module actually loaded at boot.
   if (method === 'GET' && url.pathname === '/api/adapters/plugins') {
     return sendJson(res, 200, listPlugins());
+  }
+  // ---- self-update (git-clone install; safety rails in updater.mjs) ----
+  if (method === 'GET' && url.pathname === '/api/version') {
+    return sendJson(res, 200, { version: getCurrentVersion() });
+  }
+  if (method === 'GET' && url.pathname === '/api/update/check') {
+    try { return sendJson(res, 200, await checkLatest()); }
+    catch (e) { return sendJson(res, 502, { error: String((e && e.message) || e) }); }
+  }
+  if (method === 'POST' && url.pathname === '/api/update/apply') {
+    const r = applyUpdate();
+    return sendJson(res, r.ok ? 200 : 409, r);
+  }
+  // Respond first, then die: the detached wrapper restarts a fresh copy once
+  // the port is released; the UI polls /api/version until it comes back.
+  if (method === 'POST' && url.pathname === '/api/update/restart') {
+    sendJson(res, 200, { restarting: true });
+    restartSelf();
+    return;
   }
   // Distill pipe (L1 -> L2), manual path: digest a whole group, or pin one
   // exact message, into the knowledge base. Re-distilling the same group

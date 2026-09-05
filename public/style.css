@@ -807,3 +807,15 @@ body.drawer-open #resRight { display: block; }
 .lib-save { align-self: flex-start; padding: 5px 14px; font-size: 11px; border-radius: var(--r-pill); border: 1px solid var(--accent); background: var(--accent-soft); color: var(--accent); cursor: pointer; transition: all .12s; }
 .lib-save:hover { background: var(--accent); color: #fff; }
 .lib-note-body { margin: 0; padding: 12px 16px; max-height: 60vh; overflow-y: auto; font-size: 12px; line-height: 1.7; font-family: var(--font-mono); white-space: pre-wrap; word-break: break-word; color: var(--text); }
+
+/* ================= 关于 / 检查更新（设置弹窗底部） ================= */
+.about-bar { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-top: 1px solid var(--border); background: var(--panel2); position: sticky; bottom: 0; }
+.about-ver { font-size: 12px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+.about-btn { padding: 5px 14px; font-size: 11px; border-radius: var(--r-pill); border: 1px solid var(--border); background: var(--panel3); color: var(--muted); cursor: pointer; transition: all .12s; }
+.about-btn:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
+.about-btn:disabled { opacity: .5; cursor: default; }
+.about-btn.apply { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.about-btn.apply:hover { background: var(--accent); color: #fff; }
+.about-msg { flex: 1; min-width: 0; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.about-msg a { color: var(--accent); text-decoration: none; }
+.about-msg a:hover { text-decoration: underline; }

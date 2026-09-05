@@ -1,12 +1,12 @@
 {
   "name": "zjl-achat",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "type": "module",
   "description": "zjl-Achat - local-first multi-agent group chat hub (agent 群聊枢纽).",
   "scripts": {
     "start": "node server/server.mjs",
-    "test": "node scripts/test-mentions.mjs && node scripts/test-ask.mjs && node scripts/test-offline.mjs && node scripts/test-contrast.mjs && node scripts/test-store.mjs && node scripts/_probe_m4.mjs && node scripts/_probe_m5.mjs && node scripts/_probe_w_clikey.mjs && node --test tests/unit.test.mjs tests/memory.test.mjs tests/isolation.test.mjs tests/memory-engine.test.mjs",
+    "test": "node scripts/test-mentions.mjs && node scripts/test-ask.mjs && node scripts/test-offline.mjs && node scripts/test-contrast.mjs && node scripts/test-store.mjs && node scripts/_probe_m4.mjs && node scripts/_probe_m5.mjs && node scripts/_probe_w_clikey.mjs && node --test tests/unit.test.mjs tests/memory.test.mjs tests/isolation.test.mjs tests/memory-engine.test.mjs tests/plugin.test.mjs tests/update.test.mjs",
     "test:unit": "node --test tests/unit.test.mjs"
   },
   "engines": {

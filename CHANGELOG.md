@@ -3,6 +3,12 @@
 All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [1.0.1] - 2026-09-05
+
+### Added
+
+- **In-app updates** (Settings → About bar): one-click "check update" compares the running build against the latest GitHub release; "apply" runs a safety-railed git fast-forward (refuses dirty working trees and diverged history, never overwrites local changes) and restarts the server from the UI. Zero dependencies; poll-until-back reload in the frontend.
+
 ## [1.0.0] - 2026-09-05
 
 First tagged release. Local-first, zero-dependency multi-agent group chat hub — one `node server/server.mjs`, no npm install.
