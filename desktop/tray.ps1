@@ -111,7 +111,7 @@ $trayCode = { param($root, $node)
     $PORT = 8787
     $URL  = "http://127.0.0.1:$PORT"
     $EDGE = 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'
-    $iconPath = Join-Path $ROOT 'desktop/icon.ico'
+    $iconPath = Join-Path $ROOT 'desktop/tmesh.ico'
 
     if (Test-Path $iconPath) { $icon = New-Object System.Drawing.Icon($iconPath) }
     else { try { $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($EDGE) } catch { $icon = [System.Drawing.SystemIcons]::Application } }
