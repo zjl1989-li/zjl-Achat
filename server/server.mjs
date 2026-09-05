@@ -13,6 +13,41 @@ import { describeProbe } from './adapters.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+// --- single-instance lock (zero-dep) ---
+// Tray launcher + a manual `node server/server.mjs` (or two launches with
+// different PORT env values) could otherwise run concurrently and race on
+// data.json writes. A pid lockfile makes the second instance exit early.
+// Best-effort: if the lock cannot be written we still start (never brick).
+const LOCK_FILE = join(__dirname, '.achat.lock');
+function acquireLock() {
+  try {
+    if (existsSync(LOCK_FILE)) {
+      const prev = parseInt(readFileSync(LOCK_FILE, 'utf8'), 10);
+      if (prev && prev !== process.pid) {
+        try {
+          process.kill(prev, 0);   // throws if the pid is not alive
+          return false;            // another instance is truly running
+        } catch { /* stale lock from a crashed process: take over */ }
+      }
+    }
+    writeFileSync(LOCK_FILE, String(process.pid));
+    return true;
+  } catch { return true; }
+}
+function releaseLock() {
+  try {
+    if (parseInt(readFileSync(LOCK_FILE, 'utf8'), 10) === process.pid) unlinkSync(LOCK_FILE);
+  } catch { /* ignore */ }
+}
+if (!acquireLock()) {
+  console.error(`zjl-Achat is already running (pid lock: ${LOCK_FILE}). Exiting.`);
+  process.exit(1);
+}
+process.on('exit', releaseLock);
+for (const sig of ['SIGINT', 'SIGTERM']) {
+  process.on(sig, () => { releaseLock(); process.exit(0); });
+}
+
 // Load .env (optional, git-ignored) so CODEBUDDY_API_KEY etc. can live in a file
 // instead of shell env. Zero-dep; never overrides an existing process.env value.
 // ---------------- local agent discovery ----------------

@@ -21,6 +21,8 @@ server/data.json.pre-optimize
 
 # temp probes / scratch from dev sessions
 _probe/
+scripts/archive/
+server/.achat.lock
 %SystemDrive%/
 tmp-*.mjs
 dshhist.json

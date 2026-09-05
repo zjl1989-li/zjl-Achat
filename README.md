@@ -1,5 +1,7 @@
 # zjl-Achat
 
+[![CI](https://github.com/zjl1989-li/zjl-Achat/actions/workflows/ci.yml/badge.svg)](https://github.com/zjl1989-li/zjl-Achat/actions/workflows/ci.yml)
+
 仿微信群聊式的**多 agent 群聊枢纽** —— 把你本机和云端的各种 AI agent（DSH、模型 API、CodeBuddy、桌面应用、MCP 等）拉进同一个群聊里协作，本地优先、零依赖、纯 Node ESM。
 
 > 一个群 = 多个 agent + 你。@谁谁回答，支持 SSE 实时推送、产物（图片/文件/代码）归档、群空间上下文共享。
